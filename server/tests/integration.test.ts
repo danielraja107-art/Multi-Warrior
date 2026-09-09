@@ -39,7 +39,10 @@ async function main() {
   const host = players.find((p: any) => p.isHost);
   check(!!host, 'a host exists');
   const colors = players.map((p: any) => p.color).sort();
-  check(JSON.stringify(colors) === JSON.stringify(['blue', 'red']), `distinct colors assigned (${colors.join(',')})`);
+  check(
+    JSON.stringify(colors) === JSON.stringify(['blue', 'red']),
+    `distinct colors assigned (${colors.join(',')})`,
+  );
 
   check(st.difficulty === 'normal', 'default difficulty normal');
 
@@ -55,7 +58,10 @@ async function main() {
 
   const hostPlayer = [...st.players.values()].find((p: any) => p.isHost);
   const moved = hostPlayer && hostPlayer.position.x > -5 + 1e-4;
-  check(!!moved, `server-authoritative game movement applied (x=${hostPlayer?.position.x?.toFixed(2)})`);
+  check(
+    !!moved,
+    `server-authoritative game movement applied (x=${hostPlayer?.position.x?.toFixed(2)})`,
+  );
 
   console.log(failures.length === 0 ? '\nALL TESTS PASSED' : `\n${failures.length} TESTS FAILED`);
   room1.leave();

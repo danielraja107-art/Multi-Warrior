@@ -12,7 +12,7 @@ const PLAYER_COLORS: PlayerColor[] = [
 
 const MAX_PLAYERS = 4;
 const TICK_INTERVAL_MS = 50;
-const RECONNECT_TIMEOUT_MS = 30000;
+const RECONNECT_TIMEOUT_MS = Number(process.env.STORM_RECONNECT_TIMEOUT_MS || '30000');
 
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -39,27 +39,38 @@ export class GameRoom extends Room<GameState> {
     this.state.phase = RoomPhase.LOBBY;
     this.state.difficulty = options.difficulty ?? Difficulty.NORMAL;
     this.state.maxWaves = 5;
+    this.setMetadata({ code: this.state.roomCode });
 
     this.setSimulationInterval((deltaTime: number) => {
       this.serverTick(deltaTime);
     }, TICK_INTERVAL_MS);
 
-    this.onMessage(MESSAGE_CLIENT.PLAYER_MOVE, (client, payload: { direction: { x: number; y: number; z: number }; rotation?: { x: number; y: number }; timestamp: number }) => {
-      const player = this.state.players.get(client.sessionId);
-      if (!player || !player.isAlive) return;
+    this.onMessage(
+      MESSAGE_CLIENT.PLAYER_MOVE,
+      (
+        client,
+        payload: {
+          direction: { x: number; y: number; z: number };
+          rotation?: { x: number; y: number };
+          timestamp: number;
+        },
+      ) => {
+        const player = this.state.players.get(client.sessionId);
+        if (!player || !player.isAlive) return;
 
-      const { x, y, z } = payload.direction;
-      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
-      const magnitude = Math.sqrt(x * x + y * y + z * z);
-      if (magnitude > 1.01) return;
+        const { x, y, z } = payload.direction;
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
+        const magnitude = Math.sqrt(x * x + y * y + z * z);
+        if (magnitude > 1.01) return;
 
-      this.velocities.set(client.sessionId, { x, y, z });
+        this.velocities.set(client.sessionId, { x, y, z });
 
-      if (payload.rotation) {
-        player.rotation.x = payload.rotation.x;
-        player.rotation.y = payload.rotation.y;
-      }
-    });
+        if (payload.rotation) {
+          player.rotation.x = payload.rotation.x;
+          player.rotation.y = payload.rotation.y;
+        }
+      },
+    );
 
     this.onMessage(MESSAGE_CLIENT.HOST_START, (client) => {
       const player = this.state.players.get(client.sessionId);
@@ -72,16 +83,19 @@ export class GameRoom extends Room<GameState> {
       this.state.phase = RoomPhase.GAME;
     });
 
-    this.onMessage(MESSAGE_CLIENT.HOST_CHANGE_DIFFICULTY, (client, payload: { difficulty: string }) => {
-      const player = this.state.players.get(client.sessionId);
-      if (!player || !player.isHost) return;
-      if (this.state.phase !== RoomPhase.LOBBY) return;
+    this.onMessage(
+      MESSAGE_CLIENT.HOST_CHANGE_DIFFICULTY,
+      (client, payload: { difficulty: string }) => {
+        const player = this.state.players.get(client.sessionId);
+        if (!player || !player.isHost) return;
+        if (this.state.phase !== RoomPhase.LOBBY) return;
 
-      const validDifficulties: string[] = [Difficulty.EASY, Difficulty.NORMAL, Difficulty.HARD];
-      if (validDifficulties.includes(payload.difficulty)) {
-        this.state.difficulty = payload.difficulty;
-      }
-    });
+        const validDifficulties: string[] = [Difficulty.EASY, Difficulty.NORMAL, Difficulty.HARD];
+        if (validDifficulties.includes(payload.difficulty)) {
+          this.state.difficulty = payload.difficulty;
+        }
+      },
+    );
   }
 
   onJoin(client: Client) {
@@ -125,18 +139,20 @@ export class GameRoom extends Room<GameState> {
         }
       }
     } else {
-      this.allowReconnection(client, RECONNECT_TIMEOUT_MS).then(() => {
-        const player = this.state.players.get(client.sessionId);
-        if (player) {
-          player.sessionId = client.sessionId;
-        }
-      }).catch(() => {
-        this.state.players.delete(client.sessionId);
-        this.velocities.delete(client.sessionId);
-        if (this.state.players.size === 0) {
-          this.disconnect();
-        }
-      });
+      this.allowReconnection(client, RECONNECT_TIMEOUT_MS)
+        .then(() => {
+          const player = this.state.players.get(client.sessionId);
+          if (player) {
+            player.sessionId = client.sessionId;
+          }
+        })
+        .catch(() => {
+          this.state.players.delete(client.sessionId);
+          this.velocities.delete(client.sessionId);
+          if (this.state.players.size === 0) {
+            this.disconnect();
+          }
+        });
     }
   }
 

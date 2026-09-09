@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+*.tsbuildinfo
+
+# Prisma
+database/prisma/migrations/.keep

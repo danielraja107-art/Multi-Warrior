@@ -34,6 +34,7 @@ class GameRoom extends colyseus_1.Room {
         this.state.phase = shared_2.RoomPhase.LOBBY;
         this.state.difficulty = options.difficulty ?? shared_2.Difficulty.NORMAL;
         this.state.maxWaves = 5;
+        this.setMetadata({ code: this.state.roomCode });
         this.setSimulationInterval((deltaTime) => {
             this.serverTick(deltaTime);
         }, TICK_INTERVAL_MS);
@@ -112,12 +113,14 @@ class GameRoom extends colyseus_1.Room {
             }
         }
         else {
-            this.allowReconnection(client, RECONNECT_TIMEOUT_MS).then(() => {
+            this.allowReconnection(client, RECONNECT_TIMEOUT_MS)
+                .then(() => {
                 const player = this.state.players.get(client.sessionId);
                 if (player) {
                     player.sessionId = client.sessionId;
                 }
-            }).catch(() => {
+            })
+                .catch(() => {
                 this.state.players.delete(client.sessionId);
                 this.velocities.delete(client.sessionId);
                 if (this.state.players.size === 0) {
