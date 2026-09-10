@@ -81,7 +81,7 @@ Create the contracts and server foundation that allow the other two members to w
 - [x] Configure shared import paths.
 - [x] Establish formatting/linting rules.
 - [x] Establish development scripts for client and server.
-- [ ] Verify local client + server startup.
+- [x] Verify local client + server startup.
 - [x] Document environment variables required by the server.
 
 ## 0.2 Shared contracts — highest priority
@@ -176,13 +176,13 @@ Provide a working server-authoritative movement path for one player.
 ### Handoff / integration
 
 - [x] Tell Member 2 the exact movement contract.
-- [ ] Verify Member 2 can render the authoritative position.
-- [ ] Verify local movement prediction can reconcile to server state.
+- [x] Verify Member 2 can render the authoritative position.
+- [x] Verify local movement prediction can reconcile to server state.
 - [x] Do not require Member 2 to wait for combat, AI, or waves.
 
 ### Done when
 
-- [ ] One browser moves a player.
+- [x] One browser moves a player.
 - [x] Server owns the final position.
 - [x] Client receives authoritative position updates.
 - [x] No state is accepted from the client as truth.
