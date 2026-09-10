@@ -2,6 +2,7 @@ import { Room, Client } from 'colyseus';
 import { GameState, Player } from '@storm-arena/shared';
 import { RoomPhase, Difficulty, PlayerColor, PlayerState, WeaponType } from '@storm-arena/shared';
 import { MESSAGE_CLIENT } from '@storm-arena/shared';
+import { MovementSystem, PLAYER_SPEED, MOVEMENT_BOUNDARY, MovementInput } from '../gameplay/movement/MovementSystem';
 
 const PLAYER_COLORS: PlayerColor[] = [
   PlayerColor.RED,
@@ -23,15 +24,9 @@ function generateRoomCode(): string {
   return code;
 }
 
-interface PlayerVelocity {
-  x: number;
-  y: number;
-  z: number;
-}
-
 export class GameRoom extends Room<GameState> {
   maxClients = MAX_PLAYERS;
-  private velocities: Map<string, PlayerVelocity> = new Map();
+  private movement = new MovementSystem();
 
   onCreate(options: { difficulty?: string }) {
     this.setState(new GameState());
@@ -44,21 +39,14 @@ export class GameRoom extends Room<GameState> {
       this.serverTick(deltaTime);
     }, TICK_INTERVAL_MS);
 
-    this.onMessage(MESSAGE_CLIENT.PLAYER_MOVE, (client, payload: { direction: { x: number; y: number; z: number }; rotation?: { x: number; y: number }; timestamp: number }) => {
+    this.onMessage(MESSAGE_CLIENT.PLAYER_MOVE, (client, payload: MovementInput) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || !player.isAlive) return;
 
-      const { x, y, z } = payload.direction;
-      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
-      const magnitude = Math.sqrt(x * x + y * y + z * z);
-      if (magnitude > 1.01) return;
+      const normalized = this.normalizeMoveInput(payload);
+      if (!normalized) return;
 
-      this.velocities.set(client.sessionId, { x, y, z });
-
-      if (payload.rotation) {
-        player.rotation.x = payload.rotation.x;
-        player.rotation.y = payload.rotation.y;
-      }
+      this.movement.enqueueInput(client.sessionId, normalized);
     });
 
     this.onMessage(MESSAGE_CLIENT.HOST_START, (client) => {
@@ -104,7 +92,6 @@ export class GameRoom extends Room<GameState> {
     player.position.y = 0;
     player.position.z = 0;
 
-    this.velocities.set(client.sessionId, { x: 0, y: 0, z: 0 });
     this.state.players.set(client.sessionId, player);
 
     if (player.isHost) {
@@ -115,7 +102,7 @@ export class GameRoom extends Room<GameState> {
   onLeave(client: Client, consented: boolean) {
     if (this.state.phase === RoomPhase.LOBBY) {
       this.state.players.delete(client.sessionId);
-      this.velocities.delete(client.sessionId);
+      this.movement.clear(client.sessionId);
 
       if (this.state.players.size > 0) {
         const firstEntry = this.state.players.entries().next().value;
@@ -132,7 +119,7 @@ export class GameRoom extends Room<GameState> {
         }
       }).catch(() => {
         this.state.players.delete(client.sessionId);
-        this.velocities.delete(client.sessionId);
+        this.movement.clear(client.sessionId);
         if (this.state.players.size === 0) {
           this.disconnect();
         }
@@ -144,34 +131,61 @@ export class GameRoom extends Room<GameState> {
     this.state.players.clear();
     this.state.enemies.clear();
     this.state.weaponPickups.clear();
-    this.velocities.clear();
+    this.movement.clearAll();
+  }
+
+  private normalizeMoveInput(input: MovementInput): MovementInput | null {
+    if (!input || typeof input !== 'object') return null;
+
+    const ts = Number(input.timestamp);
+    if (!Number.isFinite(ts)) return null;
+    if (!input.direction || typeof input.direction !== 'object') return null;
+
+    const { x, y, z } = input.direction;
+    if (
+      typeof x !== 'number' || !Number.isFinite(x) ||
+      typeof y !== 'number' || !Number.isFinite(y) ||
+      typeof z !== 'number' || !Number.isFinite(z)
+    ) {
+      return null;
+    }
+
+    const magnitude = Math.sqrt(x * x + y * y + z * z);
+    if (magnitude > 1.01) return null;
+
+    return {
+      direction: { x, y, z },
+      rotation: input.rotation ? { x: Number(input.rotation.x), y: Number(input.rotation.y) } : undefined,
+      timestamp: ts,
+    };
   }
 
   private serverTick(deltaTime: number) {
     if (this.state.phase !== RoomPhase.GAME) return;
 
     this.state.elapsedTime += deltaTime;
+    const dt = deltaTime / 1000;
 
-    this.state.players.forEach((player) => {
+    this.state.players.forEach((player, sessionId) => {
       if (!player.isAlive) return;
 
-      const vel = this.velocities.get(player.sessionId);
-      if (!vel) return;
+      const update = this.movement.update(sessionId, deltaTime);
 
-      const speed = 5.0;
-      const dt = deltaTime / 1000;
+      player.position.x += update.velocity.x * PLAYER_SPEED * dt;
+      player.position.y += update.velocity.y * PLAYER_SPEED * dt;
+      player.position.z += update.velocity.z * PLAYER_SPEED * dt;
 
-      player.position.x += vel.x * speed * dt;
-      player.position.y += vel.y * speed * dt;
-      player.position.z += vel.z * speed * dt;
+      player.position.x = Math.max(-MOVEMENT_BOUNDARY, Math.min(MOVEMENT_BOUNDARY, player.position.x));
+      player.position.y = Math.max(-MOVEMENT_BOUNDARY, Math.min(MOVEMENT_BOUNDARY, player.position.y));
+      player.position.z = Math.max(-MOVEMENT_BOUNDARY, Math.min(MOVEMENT_BOUNDARY, player.position.z));
 
-      const boundary = 20;
-      player.position.x = Math.max(-boundary, Math.min(boundary, player.position.x));
-      player.position.y = Math.max(-boundary, Math.min(boundary, player.position.y));
-      player.position.z = Math.max(-boundary, Math.min(boundary, player.position.z));
+      if (update.rotation) {
+        player.rotation.x = update.rotation.x;
+        player.rotation.y = update.rotation.y;
+        player.rotation.z = update.rotation.z ?? 0;
+      }
 
-      const hasInput = Math.abs(vel.x) > 0.01 || Math.abs(vel.y) > 0.01 || Math.abs(vel.z) > 0.01;
-      player.state = hasInput ? PlayerState.RUNNING : PlayerState.IDLE;
+      player.state = update.hasInput ? PlayerState.RUNNING : PlayerState.IDLE;
     });
   }
 }

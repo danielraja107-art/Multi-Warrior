@@ -162,30 +162,30 @@ Provide a working server-authoritative movement path for one player.
 
 ### Tasks
 
-- [ ] Implement player input queue.
-- [ ] Validate `PLAYER_MOVE` input.
-- [ ] Reject invalid direction values.
-- [ ] Apply movement on the server.
-- [ ] Keep server position authoritative.
-- [ ] Update player position in `GameState`.
-- [ ] Broadcast authoritative position through Colyseus state sync.
-- [ ] Add basic movement boundaries.
-- [ ] Verify 20 Hz server update loop.
-- [ ] Add basic server-side movement tests.
+- [x] Implement player input queue.
+- [x] Validate `PLAYER_MOVE` input.
+- [x] Reject invalid direction values.
+- [x] Apply movement on the server.
+- [x] Keep server position authoritative.
+- [x] Update player position in `GameState`.
+- [x] Broadcast authoritative position through Colyseus state sync.
+- [x] Add basic movement boundaries.
+- [x] Verify 20 Hz server update loop.
+- [x] Add basic server-side movement tests.
 
 ### Handoff / integration
 
-- [ ] Tell Member 2 the exact movement contract.
+- [x] Tell Member 2 the exact movement contract.
 - [ ] Verify Member 2 can render the authoritative position.
 - [ ] Verify local movement prediction can reconcile to server state.
-- [ ] Do not require Member 2 to wait for combat, AI, or waves.
+- [x] Do not require Member 2 to wait for combat, AI, or waves.
 
 ### Done when
 
 - [ ] One browser moves a player.
-- [ ] Server owns the final position.
-- [ ] Client receives authoritative position updates.
-- [ ] No state is accepted from the client as truth.
+- [x] Server owns the final position.
+- [x] Client receives authoritative position updates.
+- [x] No state is accepted from the client as truth.
 
 ---
 
