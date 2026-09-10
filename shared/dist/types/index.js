@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GameEvent = exports.EnemyType = exports.AttackType = exports.WeaponType = exports.PlayerColor = exports.Difficulty = exports.RoomPhase = exports.BossAttack = exports.BossPhase = exports.EnemyState = exports.PlayerState = void 0;
+exports.GameEvent = exports.EnemyType = exports.AttackType = exports.WeaponType = exports.PlayerColor = exports.Difficulty = exports.ConnectionStatus = exports.RoomPhase = exports.BossAttack = exports.BossPhase = exports.EnemyState = exports.PlayerState = void 0;
 var PlayerState;
 (function (PlayerState) {
     PlayerState["IDLE"] = "idle";
@@ -46,6 +46,13 @@ var RoomPhase;
     RoomPhase["VICTORY"] = "victory";
     RoomPhase["GAME_OVER"] = "game_over";
 })(RoomPhase || (exports.RoomPhase = RoomPhase = {}));
+var ConnectionStatus;
+(function (ConnectionStatus) {
+    ConnectionStatus["DISCONNECTED"] = "disconnected";
+    ConnectionStatus["CONNECTING"] = "connecting";
+    ConnectionStatus["CONNECTED"] = "connected";
+    ConnectionStatus["RECONNECTING"] = "reconnecting";
+})(ConnectionStatus || (exports.ConnectionStatus = ConnectionStatus = {}));
 var Difficulty;
 (function (Difficulty) {
     Difficulty["EASY"] = "easy";

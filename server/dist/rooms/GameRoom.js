@@ -14,7 +14,7 @@ const PLAYER_COLORS = [
 ];
 const MAX_PLAYERS = 4;
 const TICK_INTERVAL_MS = 50;
-const RECONNECT_TIMEOUT_MS = 30000;
+const RECONNECT_TIMEOUT_MS = Number(process.env.STORM_RECONNECT_TIMEOUT_MS || '30000');
 function generateRoomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
@@ -35,6 +35,7 @@ class GameRoom extends colyseus_1.Room {
         this.state.phase = shared_2.RoomPhase.LOBBY;
         this.state.difficulty = options.difficulty ?? shared_2.Difficulty.NORMAL;
         this.state.maxWaves = 5;
+        this.setMetadata({ code: this.state.roomCode });
         this.setSimulationInterval((deltaTime) => {
             this.serverTick(deltaTime);
         }, TICK_INTERVAL_MS);

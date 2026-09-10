@@ -13,7 +13,7 @@ const PLAYER_COLORS: PlayerColor[] = [
 
 const MAX_PLAYERS = 4;
 const TICK_INTERVAL_MS = 50;
-const RECONNECT_TIMEOUT_MS = 30000;
+const RECONNECT_TIMEOUT_MS = Number(process.env.STORM_RECONNECT_TIMEOUT_MS || '30000');
 
 function generateRoomCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -34,6 +34,7 @@ export class GameRoom extends Room<GameState> {
     this.state.phase = RoomPhase.LOBBY;
     this.state.difficulty = options.difficulty ?? Difficulty.NORMAL;
     this.state.maxWaves = 5;
+    this.setMetadata({ code: this.state.roomCode });
 
     this.setSimulationInterval((deltaTime: number) => {
       this.serverTick(deltaTime);

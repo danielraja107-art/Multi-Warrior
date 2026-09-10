@@ -43,6 +43,13 @@ export enum RoomPhase {
   GAME_OVER = 'game_over',
 }
 
+export enum ConnectionStatus {
+  DISCONNECTED = 'disconnected',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  RECONNECTING = 'reconnecting',
+}
+
 export enum Difficulty {
   EASY = 'easy',
   NORMAL = 'normal',
