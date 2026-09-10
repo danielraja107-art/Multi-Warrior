@@ -101,6 +101,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   onLeave(client: Client, consented: boolean) {
+    const player = this.state.players.get(client.sessionId);
     if (this.state.phase === RoomPhase.LOBBY) {
       this.state.players.delete(client.sessionId);
       this.movement.clear(client.sessionId);
@@ -112,15 +113,21 @@ export class GameRoom extends Room<GameState> {
           this.state.hostId = firstEntry[1].id;
         }
       }
-    } else {
-      this.allowReconnection(client, RECONNECT_TIMEOUT_MS).then(() => {
-        const player = this.state.players.get(client.sessionId);
-        if (player) {
-          player.sessionId = client.sessionId;
+    } else if (player) {
+      // Hold the player's slot for the reconnect window. Clear movement so the
+      // held player freezes in place instead of drifting on their last velocity.
+      this.movement.clear(client.sessionId);
+
+      // allowReconnection takes SECONDS (colyseus semantics), not milliseconds.
+      this.allowReconnection(client, RECONNECT_TIMEOUT_MS / 1000).then(() => {
+        // colyseus preserves the original sessionId on reconnect, so the player
+        // entry — position, rotation, health, weapon, alive state — is restored as-is.
+        const restored = this.state.players.get(client.sessionId);
+        if (restored) {
+          restored.sessionId = client.sessionId;
         }
       }).catch(() => {
         this.state.players.delete(client.sessionId);
-        this.movement.clear(client.sessionId);
         if (this.state.players.size === 0) {
           this.disconnect();
         }

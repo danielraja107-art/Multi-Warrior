@@ -197,50 +197,50 @@ Support 2–4 players in one room with room code, host state, lobby state, and r
 
 ### Room lifecycle
 
-- [ ] Implement room creation.
-- [ ] Generate room code.
-- [ ] Implement room joining by code.
-- [ ] Set Player 1 as host.
-- [ ] Track player count.
-- [ ] Enforce 2–4 player room limit according to project rules.
-- [ ] Implement host `START` command.
-- [ ] Transition room from `lobby` to `game` phase.
-- [ ] Prevent non-host start when host authority is required.
-- [ ] Handle player disconnect.
-- [ ] Hold disconnected player slot for 30 seconds.
-- [ ] Support reconnect into the same room.
-- [ ] Restore the player's current state.
-- [ ] Remove the slot after the reconnect window expires.
-- [ ] Destroy the room when no players remain.
+- [x] Implement room creation.
+- [x] Generate room code.
+- [x] Implement room joining by code.
+- [x] Set Player 1 as host.
+- [x] Track player count.
+- [x] Enforce 2–4 player room limit according to project rules.
+- [x] Implement host `START` command.
+- [x] Transition room from `lobby` to `game` phase.
+- [x] Prevent non-host start when host authority is required.
+- [x] Handle player disconnect.
+- [x] Hold disconnected player slot for 30 seconds.
+- [x] Support reconnect into the same room.
+- [x] Restore the player's current state.
+- [x] Remove the slot after the reconnect window expires.
+- [x] Destroy the room when no players remain.
 
 ### Player synchronization
 
-- [ ] Spawn each player in an appropriate position.
-- [ ] Assign Red / Blue / Green / Yellow player color order.
-- [ ] Synchronize position.
-- [ ] Synchronize rotation.
-- [ ] Synchronize alive/dead state.
-- [ ] Synchronize health.
-- [ ] Synchronize host state.
-- [ ] Validate movement from all connected clients.
+- [x] Spawn each player in an appropriate position.
+- [x] Assign Red / Blue / Green / Yellow player color order.
+- [x] Synchronize position.
+- [x] Synchronize rotation.
+- [x] Synchronize alive/dead state.
+- [x] Synchronize health.
+- [x] Synchronize host state.
+- [x] Validate movement from all connected clients.
 
 ### Difficulty
 
-- [ ] Add `easy`, `normal`, `hard` room difficulty state.
-- [ ] Validate that only authorized lobby action changes difficulty.
-- [ ] Broadcast difficulty changes.
-- [ ] Freeze difficulty after game start unless explicitly designed otherwise.
+- [x] Add `easy`, `normal`, `hard` room difficulty state.
+- [x] Validate that only authorized lobby action changes difficulty.
+- [x] Broadcast difficulty changes.
+- [x] Freeze difficulty after game start unless explicitly designed otherwise.
 
 ### Integration gate
 
-- [ ] Test 2 clients.
-- [ ] Test 3 clients.
-- [ ] Test 4 clients.
-- [ ] Test one disconnect.
-- [ ] Test reconnect within 30 seconds.
-- [ ] Test reconnect after 30 seconds.
-- [ ] Verify Member 3 lobby UI receives all required state.
-- [ ] Verify Member 2 can render all four players.
+- [x] Test 2 clients.
+- [x] Test 3 clients.
+- [x] Test 4 clients.
+- [x] Test one disconnect.
+- [x] Test reconnect within 30 seconds.
+- [x] Test reconnect after 30 seconds.
+- [x] Verify Member 3 lobby UI receives all required state.
+- [x] Verify Member 2 can render all four players.
 
 ---
 
