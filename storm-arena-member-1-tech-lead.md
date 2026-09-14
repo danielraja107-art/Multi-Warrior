@@ -461,51 +461,51 @@ Build the complete server-driven wave director and spawn lifecycle.
 
 ### WaveDirector
 
-- [ ] Create `WaveDirector.ts`.
-- [ ] Calculate enemy budget.
-- [ ] Apply player-count scaling.
-- [ ] Apply difficulty multiplier.
-- [ ] Select enemy composition.
-- [ ] Track active wave.
-- [ ] Track enemies remaining.
-- [ ] Detect wave completion.
-- [ ] Trigger rest period.
-- [ ] Trigger next wave.
-- [ ] Trigger boss phase after the final wave.
+- [x] Create `WaveDirector.ts`.
+- [x] Calculate enemy budget.
+- [x] Apply player-count scaling.
+- [x] Apply difficulty multiplier.
+- [x] Select enemy composition.
+- [x] Track active wave.
+- [x] Track enemies remaining.
+- [x] Detect wave completion.
+- [x] Trigger rest period.
+- [x] Trigger next wave.
+- [x] Trigger boss phase after the final wave.
 
 ### SpawnManager
 
-- [ ] Create `SpawnManager.ts`.
-- [ ] Define spawn positions.
-- [ ] Prevent unsafe spawns near players.
-- [ ] Stagger enemy spawning over the configured 3–5 second period.
-- [ ] Track spawned enemies.
-- [ ] Notify WaveDirector when all wave enemies are resolved.
+- [x] Create `SpawnManager.ts`.
+- [x] Define spawn positions.
+- [x] Prevent unsafe spawns near players.
+- [x] Stagger enemy spawning over the configured 3–5 second period.
+- [x] Track spawned enemies.
+- [x] Notify WaveDirector when all wave enemies are resolved.
 
 ### Rest period
 
-- [ ] Implement 10-second rest period.
-- [ ] Heal players by 20 HP.
-- [ ] Trigger weapon respawn.
-- [ ] Prevent next wave from beginning early.
-- [ ] Broadcast `WAVE_COMPLETE`.
+- [x] Implement 10-second rest period.
+- [x] Heal players by 20 HP.
+- [x] Trigger weapon respawn.
+- [x] Prevent next wave from beginning early.
+- [x] Broadcast `WAVE_COMPLETE`.
 
 ### Wave data
 
-- [ ] Implement Wave 1 composition.
-- [ ] Implement Wave 2 composition.
-- [ ] Implement Wave 3 composition.
-- [ ] Implement Wave 4 composition / elite assault.
-- [ ] Implement Wave 5 boss trigger.
+- [x] Implement Wave 1 composition.
+- [x] Implement Wave 2 composition.
+- [x] Implement Wave 3 composition.
+- [x] Implement Wave 4 composition / elite assault.
+- [x] Implement Wave 5 boss trigger.
 
 ### Integration gate
 
-- [ ] Member 3 receives wave start.
-- [ ] Member 3 receives wave complete.
-- [ ] Member 2 sees spawned enemies correctly.
-- [ ] Test full wave lifecycle without boss.
-- [ ] Test player count 1–4 scaling rules where applicable.
-- [ ] Test Easy / Normal / Hard.
+- [x] Member 3 receives wave start.
+- [x] Member 3 receives wave complete.
+- [x] Member 2 sees spawned enemies correctly.
+- [x] Test full wave lifecycle without boss.
+- [x] Test player count 1–4 scaling rules where applicable.
+- [x] Test Easy / Normal / Hard.
 
 ---
 
