@@ -81,7 +81,7 @@ Create the contracts and server foundation that allow the other two members to w
 - [x] Configure shared import paths.
 - [x] Establish formatting/linting rules.
 - [x] Establish development scripts for client and server.
-- [x] Verify local client + server startup.
+- [ ] Verify local client + server startup.
 - [x] Document environment variables required by the server.
 
 ## 0.2 Shared contracts — highest priority
@@ -197,50 +197,50 @@ Support 2–4 players in one room with room code, host state, lobby state, and r
 
 ### Room lifecycle
 
-- [x] Implement room creation.
-- [x] Generate room code.
-- [x] Implement room joining by code.
-- [x] Set Player 1 as host.
-- [x] Track player count.
-- [x] Enforce 2–4 player room limit according to project rules.
-- [x] Implement host `START` command.
-- [x] Transition room from `lobby` to `game` phase.
-- [x] Prevent non-host start when host authority is required.
-- [x] Handle player disconnect.
-- [x] Hold disconnected player slot for 30 seconds.
-- [x] Support reconnect into the same room.
-- [x] Restore the player's current state.
-- [x] Remove the slot after the reconnect window expires.
-- [x] Destroy the room when no players remain.
+- [ ] Implement room creation.
+- [ ] Generate room code.
+- [ ] Implement room joining by code.
+- [ ] Set Player 1 as host.
+- [ ] Track player count.
+- [ ] Enforce 2–4 player room limit according to project rules.
+- [ ] Implement host `START` command.
+- [ ] Transition room from `lobby` to `game` phase.
+- [ ] Prevent non-host start when host authority is required.
+- [ ] Handle player disconnect.
+- [ ] Hold disconnected player slot for 30 seconds.
+- [ ] Support reconnect into the same room.
+- [ ] Restore the player's current state.
+- [ ] Remove the slot after the reconnect window expires.
+- [ ] Destroy the room when no players remain.
 
 ### Player synchronization
 
-- [x] Spawn each player in an appropriate position.
-- [x] Assign Red / Blue / Green / Yellow player color order.
-- [x] Synchronize position.
-- [x] Synchronize rotation.
-- [x] Synchronize alive/dead state.
-- [x] Synchronize health.
-- [x] Synchronize host state.
-- [x] Validate movement from all connected clients.
+- [ ] Spawn each player in an appropriate position.
+- [ ] Assign Red / Blue / Green / Yellow player color order.
+- [ ] Synchronize position.
+- [ ] Synchronize rotation.
+- [ ] Synchronize alive/dead state.
+- [ ] Synchronize health.
+- [ ] Synchronize host state.
+- [ ] Validate movement from all connected clients.
 
 ### Difficulty
 
-- [x] Add `easy`, `normal`, `hard` room difficulty state.
-- [x] Validate that only authorized lobby action changes difficulty.
-- [x] Broadcast difficulty changes.
-- [x] Freeze difficulty after game start unless explicitly designed otherwise.
+- [ ] Add `easy`, `normal`, `hard` room difficulty state.
+- [ ] Validate that only authorized lobby action changes difficulty.
+- [ ] Broadcast difficulty changes.
+- [ ] Freeze difficulty after game start unless explicitly designed otherwise.
 
 ### Integration gate
 
-- [x] Test 2 clients.
-- [x] Test 3 clients.
-- [x] Test 4 clients.
-- [x] Test one disconnect.
-- [x] Test reconnect within 30 seconds.
-- [x] Test reconnect after 30 seconds.
-- [x] Verify Member 3 lobby UI receives all required state.
-- [x] Verify Member 2 can render all four players.
+- [ ] Test 2 clients.
+- [ ] Test 3 clients.
+- [ ] Test 4 clients.
+- [ ] Test one disconnect.
+- [ ] Test reconnect within 30 seconds.
+- [ ] Test reconnect after 30 seconds.
+- [ ] Verify Member 3 lobby UI receives all required state.
+- [ ] Verify Member 2 can render all four players.
 
 ---
 
@@ -252,72 +252,72 @@ Create authoritative fist combat with light/heavy attacks, hitboxes, damage, kno
 
 ### Attack validation
 
-- [x] Validate player exists.
-- [x] Validate player is alive.
-- [x] Validate player is not in an invalid state.
-- [x] Validate weapon matches server-held weapon.
-- [x] Validate cooldown.
-- [x] Validate attack type.
-- [x] Accept attack timestamp.
-- [x] Reject malformed attack input.
+- [ ] Validate player exists.
+- [ ] Validate player is alive.
+- [ ] Validate player is not in an invalid state.
+- [ ] Validate weapon matches server-held weapon.
+- [ ] Validate cooldown.
+- [ ] Validate attack type.
+- [ ] Accept attack timestamp.
+- [ ] Reject malformed attack input.
 
 ### Hitbox system
 
-- [x] Create `HitboxSystem.ts`.
-- [x] Define fist sphere hitbox.
-- [x] Define active frames for fist.
-- [x] Track attack start time/frame.
-- [x] Activate hitbox only during active window.
-- [x] Deactivate hitbox outside active window.
-- [x] Implement one-hit-per-swing-per-enemy tracking.
-- [x] Ensure repeated overlap does not repeatedly damage the same enemy.
+- [ ] Create `HitboxSystem.ts`.
+- [ ] Define fist sphere hitbox.
+- [ ] Define active frames for fist.
+- [ ] Track attack start time/frame.
+- [ ] Activate hitbox only during active window.
+- [ ] Deactivate hitbox outside active window.
+- [ ] Implement one-hit-per-swing-per-enemy tracking.
+- [ ] Ensure repeated overlap does not repeatedly damage the same enemy.
 
 ### Damage system
 
-- [x] Create `DamageSystem.ts`.
-- [x] Apply base fist damage.
-- [x] Apply light attack multiplier.
-- [x] Apply heavy attack multiplier.
-- [x] Clamp health at zero.
-- [x] Trigger enemy state transition after damage.
-- [x] Track player damage and kill contribution.
+- [ ] Create `DamageSystem.ts`.
+- [ ] Apply base fist damage.
+- [ ] Apply light attack multiplier.
+- [ ] Apply heavy attack multiplier.
+- [ ] Clamp health at zero.
+- [ ] Trigger enemy state transition after damage.
+- [ ] Track player damage and kill contribution.
 
 ### Knockback
 
-- [x] Create `KnockbackSystem.ts`.
-- [x] Calculate knockback direction.
-- [x] Apply weapon knockback value.
-- [x] Integrate with Rapier (server-authoritative position offset; client uses Rapier for physics).
-- [x] Support wall impact.
-- [x] Support enemy-to-enemy chain knockback where applicable.
+- [ ] Create `KnockbackSystem.ts`.
+- [ ] Calculate knockback direction.
+- [ ] Apply weapon knockback value.
+- [ ] Integrate with Rapier.
+- [ ] Support wall impact.
+- [ ] Support enemy-to-enemy chain knockback where applicable.
 
 ### Dodge / block
 
-- [x] Validate dodge input.
-- [x] Apply dodge distance.
-- [x] Enforce dodge cooldown.
-- [x] Validate block state.
-- [x] Apply block damage reduction (50%).
-- [x] Prevent invalid actions during incompatible states.
+- [ ] Validate dodge input.
+- [ ] Apply dodge distance.
+- [ ] Enforce dodge cooldown.
+- [ ] Validate block state.
+- [ ] Apply block damage reduction.
+- [ ] Prevent invalid actions during incompatible states.
 
 ### Lag compensation foundation
 
-- [x] Create `PositionHistory.ts`.
-- [x] Capture enemy positions every server tick.
-- [x] Keep approximately the last one second of history.
-- [x] Use attack timestamp and latency information for rewind validation.
-- [x] Select appropriate historical snapshot.
-- [x] Perform hit detection against rewound state.
-- [x] Add tests for low, medium, and higher latency cases (unit tests cover rewind logic).
+- [ ] Create `PositionHistory.ts`.
+- [ ] Capture enemy positions every server tick.
+- [ ] Keep approximately the last one second of history.
+- [ ] Use attack timestamp and latency information for rewind validation.
+- [ ] Select appropriate historical snapshot.
+- [ ] Perform hit detection against rewound state.
+- [ ] Add tests for low, medium, and higher latency cases.
 
 ### Integration gate
 
-- [x] Member 2's attack animation sends the correct message (client sends PLAYER_ATTACK with type/weapon/timestamp).
-- [x] Member 2 receives hit result/state changes (enemy health/state synced via Colyseus state).
-- [x] Member 3 can display health/damage feedback (health in schema, GAME_EVENT for PLAYER_KILLED).
-- [x] Test two players attacking one enemy simultaneously (integration test written).
-- [x] Test one attack overlapping an enemy for multiple frames (integration test written).
-- [x] Test attack at non-zero latency (PositionHistory unit tests cover rewind).
+- [ ] Member 2's attack animation sends the correct message.
+- [ ] Member 2 receives hit result/state changes.
+- [ ] Member 3 can display health/damage feedback.
+- [ ] Test two players attacking one enemy simultaneously.
+- [ ] Test one attack overlapping an enemy for multiple frames.
+- [ ] Test attack at non-zero latency.
 
 ---
 
@@ -329,59 +329,59 @@ Implement server-authoritative enemies that detect, chase, attack, stagger, knoc
 
 ### Base enemy architecture
 
-- [x] Create `EnemySystem.ts`.
-- [x] Create reusable enemy base logic.
-- [x] Add enemy IDs.
-- [x] Add enemy health/max health.
-- [x] Add enemy state.
-- [x] Add enemy position/rotation.
-- [x] Add target player selection.
+- [ ] Create `EnemySystem.ts`.
+- [ ] Create reusable enemy base logic.
+- [ ] Add enemy IDs.
+- [ ] Add enemy health/max health.
+- [ ] Add enemy state.
+- [ ] Add enemy position/rotation.
+- [ ] Add target player selection.
 
 ### AI state machine
 
-- [x] Implement IDLE.
-- [x] Implement DETECT.
-- [x] Implement CHASE.
-- [x] Implement ATTACK.
-- [x] Implement RECOVER.
-- [x] Implement STAGGER.
-- [x] Implement KNOCKBACK.
-- [x] Implement DEAD.
-- [x] Implement transitions between states.
-- [x] Prevent invalid state transitions.
+- [ ] Implement IDLE.
+- [ ] Implement DETECT.
+- [ ] Implement CHASE.
+- [ ] Implement ATTACK.
+- [ ] Implement RECOVER.
+- [ ] Implement STAGGER.
+- [ ] Implement KNOCKBACK.
+- [ ] Implement DEAD.
+- [ ] Implement transitions between states.
+- [ ] Prevent invalid state transitions.
 
 ### Enemy types
 
-- [x] Implement BasicEnemy.
-- [x] Implement FastEnemy.
-- [x] Implement HeavyEnemy.
-- [x] Implement ShieldEnemy when required by the current phase.
-- [x] Implement RangedEnemy when required by the current phase.
-- [x] Implement EliteEnemy.
+- [ ] Implement BasicEnemy.
+- [ ] Implement FastEnemy.
+- [ ] Implement HeavyEnemy.
+- [ ] Implement ShieldEnemy when required by the current phase.
+- [ ] Implement RangedEnemy when required by the current phase.
+- [ ] Implement EliteEnemy.
 
 ### Scaling
 
-- [x] Apply enemy health scaling per wave.
-- [x] Apply enemy damage scaling per wave.
-- [x] Use shared enemy constants.
-- [x] Prevent client-controlled enemy stats.
+- [ ] Apply enemy health scaling per wave.
+- [ ] Apply enemy damage scaling per wave.
+- [ ] Use shared enemy constants.
+- [ ] Prevent client-controlled enemy stats.
 
 ### AI testing
 
-- [x] Test target acquisition.
-- [x] Test chase behavior.
-- [x] Test attack range.
-- [x] Test stagger interruption.
-- [x] Test knockback.
-- [x] Test death/removal.
-- [x] Test multiple enemies attacking the same player.
+- [ ] Test target acquisition.
+- [ ] Test chase behavior.
+- [ ] Test attack range.
+- [ ] Test stagger interruption.
+- [ ] Test knockback.
+- [ ] Test death/removal.
+- [ ] Test multiple enemies attacking the same player.
 
 ### Integration gate
 
-- [x] Member 2 can render all authoritative enemy states.
-- [x] Enemy animation state follows server state.
-- [x] Member 3 can show enemy count and wave data later.
-- [x] Verify no client can create/modify enemy health or position.
+- [ ] Member 2 can render all authoritative enemy states.
+- [ ] Enemy animation state follows server state.
+- [ ] Member 3 can show enemy count and wave data later.
+- [ ] Verify no client can create/modify enemy health or position.
 
 ---
 
@@ -393,63 +393,63 @@ Implement server-authoritative weapon pickups, equipped weapons, unique weapon h
 
 ### Weapon ownership
 
-- [ ] Create `WeaponSystem.ts`.
-- [ ] Spawn weapon pickups from server.
-- [ ] Assign weapon IDs.
-- [ ] Track available/unavailable status.
-- [ ] Validate pickup distance.
-- [ ] Validate pickup availability.
-- [ ] Assign weapon to player.
-- [ ] Drop previous weapon.
-- [ ] Broadcast updated weapon state.
+- [x] Create `WeaponSystem.ts`.
+- [x] Spawn weapon pickups from server.
+- [x] Assign weapon IDs.
+- [x] Track available/unavailable status.
+- [x] Validate pickup distance.
+- [x] Validate pickup availability.
+- [x] Assign weapon to player.
+- [x] Drop previous weapon.
+- [x] Broadcast updated weapon state.
 
 ### Weapon gameplay
 
-- [ ] Implement Fist.
-- [ ] Implement Stick.
-- [ ] Implement Baseball Bat.
-- [ ] Implement Axe.
-- [ ] Implement Hammer.
-- [ ] Implement Rock.
+- [x] Implement Fist.
+- [x] Implement Stick.
+- [x] Implement Baseball Bat.
+- [x] Implement Axe.
+- [x] Implement Hammer.
+- [x] Implement Rock.
 
 ### Per-weapon combat rules
 
-- [ ] Configure damage.
-- [ ] Configure knockback.
-- [ ] Configure cooldown.
-- [ ] Configure active frames.
-- [ ] Configure hitbox shape.
-- [ ] Configure weapon-specific attack state.
+- [x] Configure damage.
+- [x] Configure knockback.
+- [x] Configure cooldown.
+- [x] Configure active frames.
+- [x] Configure hitbox shape.
+- [x] Configure weapon-specific attack state.
 
 ### Rock projectile
 
-- [ ] Implement server-authoritative rock projectile.
-- [ ] Apply gravity arc with Rapier.
-- [ ] Validate throw direction.
-- [ ] Validate throw action.
-- [ ] Detect projectile hit.
-- [ ] Apply damage and knockback.
+- [x] Implement server-authoritative rock projectile.
+- [x] Apply gravity arc with Rapier (server gravity simulation).
+- [x] Validate throw direction.
+- [x] Validate throw action.
+- [x] Detect projectile hit.
+- [x] Apply damage and knockback.
 
 ### Weapon drops
 
-- [ ] Drop equipped weapon on player death.
-- [ ] Make dropped weapon available for pickup.
-- [ ] Prevent duplicate ownership.
-- [ ] Respawn weapons between waves according to wave lifecycle.
+- [x] Drop equipped weapon on player death.
+- [x] Make dropped weapon available for pickup.
+- [x] Prevent duplicate ownership.
+- [x] Respawn weapons between waves according to wave lifecycle.
 
 ### Integration gate
 
 For each weapon:
 
-- [ ] Member 2 has corresponding visual/animation.
-- [ ] Member 3 has pickup/weapon HUD support where needed.
-- [ ] Server behavior matches shared weapon profile.
-- [ ] Test pickup.
-- [ ] Test attack.
-- [ ] Test cooldown.
-- [ ] Test damage.
-- [ ] Test knockback.
-- [ ] Test drop.
+- [x] Member 2 has corresponding visual/animation.
+- [x] Member 3 has pickup/weapon HUD support where needed.
+- [x] Server behavior matches shared weapon profile.
+- [x] Test pickup.
+- [x] Test attack.
+- [x] Test cooldown.
+- [x] Test damage.
+- [x] Test knockback.
+- [x] Test drop.
 
 ---
 

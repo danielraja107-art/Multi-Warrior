@@ -1,8 +1,10 @@
 import { Room, Client } from 'colyseus';
 import { GameState, Player, Enemy } from '@storm-arena/shared';
-import { RoomPhase, Difficulty, PlayerColor, PlayerState, WeaponType, EnemyType, EnemyState, GameEvent, MESSAGE_CLIENT } from '@storm-arena/shared';
+import { RoomPhase, Difficulty, PlayerColor, PlayerState, WeaponType, EnemyType, EnemyState, GameEvent, MESSAGE_CLIENT, MESSAGE_SERVER } from '@storm-arena/shared';
 import { MovementSystem, PLAYER_SPEED, MOVEMENT_BOUNDARY, MovementInput } from '../gameplay/movement/MovementSystem';
 import { CombatManager } from '../gameplay/combat/CombatManager';
+import { WeaponSystem } from '../gameplay/weapons/WeaponSystem';
+import { RockProjectileSystem } from '../gameplay/weapons/RockProjectileSystem';
 
 const PLAYER_COLORS: PlayerColor[] = [
   PlayerColor.RED,
@@ -28,6 +30,8 @@ export class GameRoom extends Room<GameState> {
   maxClients = MAX_PLAYERS;
   private movement = new MovementSystem();
   private combat = new CombatManager(this);
+  private weapons = new WeaponSystem(this);
+  private projectiles = new RockProjectileSystem(this);
 
   onCreate(options: { difficulty?: string }) {
     this.setState(new GameState());
@@ -51,6 +55,35 @@ export class GameRoom extends Room<GameState> {
       this.movement.enqueueInput(client.sessionId, normalized);
     });
 
+    this.onMessage(MESSAGE_CLIENT.PLAYER_ATTACK, (client, payload) => {
+      this.combat.handleAttack(client, payload);
+    });
+
+    this.onMessage(MESSAGE_CLIENT.PLAYER_DODGE, (client, payload) => {
+      this.combat.handleDodge(client, payload);
+    });
+
+    this.onMessage(MESSAGE_CLIENT.PLAYER_BLOCK, (client, payload) => {
+      this.combat.handleBlock(client, payload);
+    });
+
+    this.onMessage(MESSAGE_CLIENT.PLAYER_PICKUP, (client, payload) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || !player.isAlive) return;
+      this.weapons.tryPickup(client.sessionId, payload.weaponPickupId);
+    });
+
+    this.onMessage(MESSAGE_CLIENT.PLAYER_THROW, (client, payload) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || !player.isAlive) return;
+      if (player.weapon !== WeaponType.ROCK) return;
+      this.projectiles.throwRock(
+        client.sessionId,
+        payload.direction,
+        { x: player.position.x, y: player.position.y + 1.5, z: player.position.z }
+      );
+    });
+
     this.onMessage(MESSAGE_CLIENT.HOST_START, (client) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || !player.isHost) return;
@@ -60,7 +93,7 @@ export class GameRoom extends Room<GameState> {
       if (playerCount < 2) return;
 
       this.state.phase = RoomPhase.GAME;
-      this.spawnTestEnemies();
+      this.startWave(this.state.currentWave + 1);
     });
 
     this.onMessage(MESSAGE_CLIENT.HOST_CHANGE_DIFFICULTY, (client, payload: { difficulty: string }) => {
@@ -105,6 +138,7 @@ export class GameRoom extends Room<GameState> {
   onLeave(client: Client, consented: boolean) {
     const player = this.state.players.get(client.sessionId);
     this.combat.onPlayerLeave(client.sessionId);
+    this.weapons.onPlayerDeath(client.sessionId);
 
     if (this.state.phase === RoomPhase.LOBBY) {
       this.state.players.delete(client.sessionId);
@@ -139,43 +173,86 @@ export class GameRoom extends Room<GameState> {
     this.state.enemies.clear();
     this.state.weaponPickups.clear();
     this.movement.clearAll();
+    this.weapons.clearAll();
+    this.projectiles.clearAll();
   }
 
-  private spawnTestEnemies(): void {
-    const enemy1 = new Enemy();
-    enemy1.id = 'test-enemy-1';
-    enemy1.type = EnemyType.BASIC;
-    enemy1.health = 50;
-    enemy1.maxHealth = 50;
-    enemy1.state = EnemyState.IDLE;
-    enemy1.position.x = -4.5;
-    enemy1.position.y = 0;
-    enemy1.position.z = 0;
-    this.state.enemies.set(enemy1.id, enemy1);
+  private startWave(wave: number): void {
+    this.state.currentWave = wave;
+    this.state.enemiesRemaining = 0;
+    this.weapons.startWave(wave);
+    this.spawnWaveEnemies(wave);
+  }
 
-    const enemy2 = new Enemy();
-    enemy2.id = 'test-enemy-2';
-    enemy2.type = EnemyType.BASIC;
-    enemy2.health = 50;
-    enemy2.maxHealth = 50;
-    enemy2.state = EnemyState.IDLE;
-    enemy2.position.x = -5;
-    enemy2.position.y = 0;
-    enemy2.position.z = 0.5;
-    this.state.enemies.set(enemy2.id, enemy2);
+  private spawnWaveEnemies(wave: number): void {
+    this.state.enemies.clear();
+    this.state.enemiesRemaining = 0;
 
-    const enemy3 = new Enemy();
-    enemy3.id = 'test-enemy-3';
-    enemy3.type = EnemyType.BASIC;
-    enemy3.health = 50;
-    enemy3.maxHealth = 50;
-    enemy3.state = EnemyState.IDLE;
-    enemy3.position.x = -3;
-    enemy3.position.y = 0;
-    enemy3.position.z = -1;
-    this.state.enemies.set(enemy3.id, enemy3);
+    const enemyCount = this.calculateEnemyCount(wave);
+    const types = this.selectEnemyTypes(wave);
 
-    this.state.enemiesRemaining = this.state.enemies.size;
+    for (let i = 0; i < enemyCount; i++) {
+      const type = types[i % types.length];
+      this.spawnEnemy(type);
+    }
+  }
+
+  private calculateEnemyCount(wave: number): number {
+    const baseCount = 3 + Math.floor(wave * 1.5);
+    const diffMult = this.getDifficultyMultiplier(this.state.difficulty);
+    return Math.round(baseCount * diffMult);
+  }
+
+  private getDifficultyMultiplier(difficulty: string): number {
+    switch (difficulty) {
+      case 'easy': return 0.8;
+      case 'normal': return 1.0;
+      case 'hard': return 1.3;
+      default: return 1.0;
+    }
+  }
+
+  private selectEnemyTypes(wave: number): EnemyType[] {
+    const pool: EnemyType[] = [EnemyType.BASIC];
+    if (wave >= 2) pool.push(EnemyType.FAST);
+    if (wave >= 3) pool.push(EnemyType.HEAVY);
+    if (wave >= 4) pool.push(EnemyType.SHIELD);
+    if (wave >= 5) pool.push(EnemyType.RANGED);
+    if (wave >= 6) pool.push(EnemyType.ELITE);
+    return pool;
+  }
+
+  private spawnEnemy(type: EnemyType): void {
+    const baseStats = this.getEnemyBaseStats(type);
+    const diffMult = this.getDifficultyMultiplier(this.state.difficulty);
+
+    const maxHealth = Math.round(baseStats.health * (1 + (this.state.currentWave - 1) * 0.15) * diffMult);
+    const damage = Math.round(baseStats.damage * (1 + (this.state.currentWave - 1) * 0.1) * diffMult);
+
+    const enemy = new Enemy();
+    enemy.id = `enemy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    enemy.type = type;
+    enemy.health = maxHealth;
+    enemy.maxHealth = maxHealth;
+    enemy.state = EnemyState.IDLE;
+    enemy.position.x = (Math.random() - 0.5) * 20;
+    enemy.position.y = 0;
+    enemy.position.z = (Math.random() - 0.5) * 20;
+    enemy.targetPlayerId = '';
+    this.state.enemies.set(enemy.id, enemy);
+    this.state.enemiesRemaining++;
+  }
+
+  private getEnemyBaseStats(type: EnemyType): { health: number; damage: number; speed: number; attackRange: number; detectionRange: number; attackCooldown: number; knockbackResistance: number } {
+    const stats: Record<EnemyType, any> = {
+      [EnemyType.BASIC]: { health: 50, damage: 10, speed: 3.0, attackRange: 1.5, detectionRange: 12.0, attackCooldown: 1500, knockbackResistance: 1.0 },
+      [EnemyType.FAST]: { health: 35, damage: 8, speed: 5.5, attackRange: 1.3, detectionRange: 14.0, attackCooldown: 1000, knockbackResistance: 0.7 },
+      [EnemyType.HEAVY]: { health: 120, damage: 18, speed: 2.0, attackRange: 2.0, detectionRange: 10.0, attackCooldown: 2000, knockbackResistance: 2.0 },
+      [EnemyType.SHIELD]: { health: 80, damage: 12, speed: 2.5, attackRange: 1.8, detectionRange: 8.0, attackCooldown: 1800, knockbackResistance: 1.5 },
+      [EnemyType.RANGED]: { health: 40, damage: 12, speed: 2.5, attackRange: 10.0, detectionRange: 16.0, attackCooldown: 2000, knockbackResistance: 0.8 },
+      [EnemyType.ELITE]: { health: 200, damage: 22, speed: 3.5, attackRange: 2.2, detectionRange: 14.0, attackCooldown: 1200, knockbackResistance: 2.5 },
+    };
+    return stats[type] ?? stats[EnemyType.BASIC];
   }
 
   private normalizeMoveInput(input: MovementInput): MovementInput | null {
@@ -235,5 +312,27 @@ export class GameRoom extends Room<GameState> {
     });
 
     this.combat.update(deltaTime);
+    this.weapons.update?.(deltaTime);
+    this.projectiles.update(deltaTime);
+
+    this.checkWaveComplete();
+  }
+
+  private checkWaveComplete(): void {
+    if (this.state.enemiesRemaining === 0 && this.state.currentWave > 0) {
+      if (this.state.currentWave >= this.state.maxWaves) {
+        this.state.phase = RoomPhase.VICTORY;
+        this.broadcast(MESSAGE_SERVER.GAME_EVENT, {
+          event: GameEvent.MATCH_END,
+          data: { victory: true },
+        });
+      } else {
+        this.state.phase = RoomPhase.LOBBY;
+        this.broadcast(MESSAGE_SERVER.GAME_EVENT, {
+          event: GameEvent.WAVE_COMPLETE,
+          data: { wave: this.state.currentWave },
+        });
+      }
+    }
   }
 }

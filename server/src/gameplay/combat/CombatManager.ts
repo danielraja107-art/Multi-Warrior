@@ -84,7 +84,7 @@ export class CombatManager {
     });
   }
 
-  private handleAttack(client: Client, payload: { type: AttackType; weapon: WeaponType; timestamp: number | bigint }): void {
+  public handleAttack(client: Client, payload: { type: AttackType; weapon: WeaponType; timestamp: number | bigint }): void {
     const player = this.room.state.players.get(client.sessionId);
     if (!player || !player.isAlive) return;
 
@@ -127,7 +127,7 @@ export class CombatManager {
     }, getWeaponCooldown(payload.weapon));
   }
 
-  private handleDodge(client: Client, payload: { direction: { x: number; y: number; z: number }; timestamp: number | bigint }): void {
+  public handleDodge(client: Client, payload: { direction: { x: number; y: number; z: number }; timestamp: number | bigint }): void {
     const player = this.room.state.players.get(client.sessionId);
     if (!player || !player.isAlive) return;
 
@@ -154,7 +154,7 @@ export class CombatManager {
     }, 250);
   }
 
-  private handleBlock(client: Client, payload: { active: boolean; timestamp: number | bigint }): void {
+  public handleBlock(client: Client, payload: { active: boolean; timestamp: number | bigint }): void {
     const player = this.room.state.players.get(client.sessionId);
     if (!player || !player.isAlive) return;
 
