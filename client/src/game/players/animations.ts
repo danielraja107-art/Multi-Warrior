@@ -20,20 +20,30 @@ export type AnimationKey =
   | 'getup'
   | 'pickup'
   | 'death'
-  | 'victory';
+  | 'victory'
+  | BossClipName;
+
+export type BossClipName =
+  | 'idle'
+  | 'walk'
+  | 'attack_heavy_punch'
+  | 'attack_sweep'
+  | 'roar'
+  | 'phase2_transition'
+  | 'attack_charge'
+  | 'attack_slam'
+  | 'phase3_transition'
+  | 'attack_spin'
+  | 'attack_grab_throw'
+  | 'enrage'
+  | 'death';
 
 export interface PlaybackRequest {
   key: AnimationKey | null;
-  /** Trigger an one-shot action; cleared after playback. */
   oneShot?: boolean;
   speed?: number;
 }
 
-/**
- * Maps server-enum strings to the canonical visual animation key.
- * - Player movement states derive from speed.
- * - Action-derived clips are triggered by client events, not state.
- */
 export function mapPlayerStateToAnimation(
   state: string,
   speed: number,
@@ -76,21 +86,6 @@ export function mapWeaponToSwingAnimation(weapon: string): AnimationKey {
   }
 }
 
-export type BossClipName =
-  | 'idle'
-  | 'walk'
-  | 'attack_heavy_punch'
-  | 'attack_sweep'
-  | 'roar'
-  | 'phase2_transition'
-  | 'attack_charge'
-  | 'attack_slam'
-  | 'phase3_transition'
-  | 'attack_spin'
-  | 'attack_grab_throw'
-  | 'enrage'
-  | 'death';
-
 export const BOSS_CLIP_SET: Record<BossClipName, true> = {
   idle: true,
   walk: true,
@@ -114,15 +109,46 @@ export interface BossActionFeed {
   isActive: boolean;
   health: number;
   maxHealth: number;
+  speed: number;
 }
 
-/** Server boss phase strings. Loosely typed to stay contract-agnostic. */
 export type BossPhaseLike = string;
 
+const WALK_THRESHOLD = 1.5;
+
+function mapAttackToClip(attack: string): BossClipName {
+  switch (attack) {
+    case 'heavy_punch':
+      return 'attack_heavy_punch';
+    case 'sweep':
+      return 'attack_sweep';
+    case 'charge':
+      return 'attack_charge';
+    case 'slam':
+      return 'attack_slam';
+    case 'roar':
+      return 'roar';
+    case 'spin_attack':
+      return 'attack_spin';
+    case 'grab_throw':
+      return 'attack_grab_throw';
+    default:
+      return 'attack_heavy_punch';
+  }
+}
+
 /**
- * Maps live boss state to the canonical rigged clip name. Falls back to
- * procedural motion while the GLB build is unrigged; once the animated
- * build lands feed the result into AnimationController.
+ * Maps live boss state to the canonical rigged clip name.
+ * Each BossAttack maps to its corresponding Mixamo clip:
+ *   heavy_punch  → attack_heavy_punch  (Mixamo: Heavy Punch)
+ *   sweep        → attack_sweep        (Mixamo: Sweep)
+ *   charge       → attack_charge       (Mixamo: Running Charge)
+ *   slam         → attack_slam         (Mixamo: Ground Slam)
+ *   roar         → roar                (Mixamo: Roar)
+ *   spin_attack  → attack_spin         (Mixamo: Spinning Kick)
+ *   grab_throw   → attack_grab_throw   (Mixamo: Grab)
+ *
+ * Idle/walk/death/enrage/phase transitions are determined by health %, speed, and isActive.
  */
 export function mapBossStateToClip(feed: BossActionFeed): {
   clip: BossClipName;
@@ -132,19 +158,37 @@ export function mapBossStateToClip(feed: BossActionFeed): {
   if (!feed.isActive || feed.health <= 0) {
     return { clip: 'death', oneShot: true, rate: 1 };
   }
+
   if (feed.isEnraged) {
-    if (feed.currentAttack) return { clip: 'attack_charge', oneShot: true, rate: 1.6 };
+    if (feed.currentAttack) {
+      return { clip: mapAttackToClip(feed.currentAttack), oneShot: true, rate: 1.6 };
+    }
     return { clip: 'enrage', oneShot: false, rate: 1.6 };
   }
+
   if (feed.currentAttack) {
-    return { clip: 'attack_heavy_punch', oneShot: true, rate: 1 };
+    return { clip: mapAttackToClip(feed.currentAttack), oneShot: true, rate: 1 };
   }
+
   const phasePct = feed.health / Math.max(1, feed.maxHealth);
-  if (phasePct <= 0.5 && phasePct > 0.2) {
-    return { clip: 'phase3_transition', oneShot: false, rate: 1 };
+
+  if (phasePct <= 0.2) {
+    return feed.speed > WALK_THRESHOLD
+      ? { clip: 'walk', oneShot: false, rate: 1 }
+      : { clip: 'phase3_transition', oneShot: false, rate: 1 };
   }
-  if (phasePct <= 0.75 && phasePct > 0.5) {
-    return { clip: 'phase2_transition', oneShot: false, rate: 1 };
+  if (phasePct <= 0.5) {
+    return feed.speed > WALK_THRESHOLD
+      ? { clip: 'walk', oneShot: false, rate: 1 }
+      : { clip: 'phase3_transition', oneShot: false, rate: 1 };
   }
-  return { clip: 'idle', oneShot: false, rate: 1 };
+  if (phasePct <= 0.75) {
+    return feed.speed > WALK_THRESHOLD
+      ? { clip: 'walk', oneShot: false, rate: 1 }
+      : { clip: 'phase2_transition', oneShot: false, rate: 1 };
+  }
+
+  return feed.speed > WALK_THRESHOLD
+    ? { clip: 'walk', oneShot: false, rate: 1 }
+    : { clip: 'idle', oneShot: false, rate: 1 };
 }

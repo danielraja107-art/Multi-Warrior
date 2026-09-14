@@ -5,6 +5,8 @@ const colyseus_1 = require("colyseus");
 const shared_1 = require("@storm-arena/shared");
 const shared_2 = require("@storm-arena/shared");
 const shared_3 = require("@storm-arena/shared");
+const BossAI_1 = require("../boss/BossAI");
+const CombatSystem_1 = require("../boss/CombatSystem");
 const PLAYER_COLORS = [
     shared_2.PlayerColor.RED,
     shared_2.PlayerColor.BLUE,
@@ -27,6 +29,10 @@ class GameRoom extends colyseus_1.Room {
         super(...arguments);
         this.maxClients = MAX_PLAYERS;
         this.velocities = new Map();
+        this.bossAI = null;
+        this.combat = new CombatSystem_1.CombatSystem();
+        this.bossSpawned = false;
+        this.bossDefeated = false;
     }
     onCreate(options) {
         this.setState(new shared_1.GameState());
@@ -53,6 +59,53 @@ class GameRoom extends colyseus_1.Room {
                 player.rotation.y = payload.rotation.y;
             }
         });
+        this.onMessage(shared_3.MESSAGE_CLIENT.PLAYER_ATTACK, (client, payload) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player || !player.isAlive)
+                return;
+            if (this.state.phase !== shared_2.RoomPhase.GAME)
+                return;
+            player.state = shared_2.PlayerState.ATTACKING;
+            if (this.state.boss.isActive && this.bossAI) {
+                const result = this.combat.handlePlayerAttack(player, payload.type, payload.weapon, this.state.boss, this.bossAI, performance.now());
+                if (result) {
+                    this.broadcast('BOSS_DAMAGE', {
+                        attackerId: client.sessionId,
+                        damage: result.damage,
+                        isDead: result.isDead,
+                        knockbackX: result.knockbackX,
+                        knockbackZ: result.knockbackZ,
+                    });
+                    if (result.isDead) {
+                        this.handleBossDefeated();
+                    }
+                }
+            }
+            setTimeout(() => {
+                const p = this.state.players.get(client.sessionId);
+                if (p && p.state === shared_2.PlayerState.ATTACKING) {
+                    p.state = shared_2.PlayerState.IDLE;
+                }
+            }, 400);
+        });
+        this.onMessage(shared_3.MESSAGE_CLIENT.PLAYER_DODGE, (client, payload) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player || !player.isAlive)
+                return;
+            player.state = shared_2.PlayerState.DODGING;
+            setTimeout(() => {
+                const p = this.state.players.get(client.sessionId);
+                if (p && p.state === shared_2.PlayerState.DODGING) {
+                    p.state = shared_2.PlayerState.IDLE;
+                }
+            }, 250);
+        });
+        this.onMessage(shared_3.MESSAGE_CLIENT.PLAYER_BLOCK, (client, payload) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player || !player.isAlive)
+                return;
+            player.state = payload.active ? shared_2.PlayerState.BLOCKING : shared_2.PlayerState.IDLE;
+        });
         this.onMessage(shared_3.MESSAGE_CLIENT.HOST_START, (client) => {
             const player = this.state.players.get(client.sessionId);
             if (!player || !player.isHost)
@@ -63,6 +116,7 @@ class GameRoom extends colyseus_1.Room {
             if (playerCount < 2)
                 return;
             this.state.phase = shared_2.RoomPhase.GAME;
+            this.startWave(1);
         });
         this.onMessage(shared_3.MESSAGE_CLIENT.HOST_CHANGE_DIFFICULTY, (client, payload) => {
             const player = this.state.players.get(client.sessionId);
@@ -131,6 +185,55 @@ class GameRoom extends colyseus_1.Room {
         this.state.enemies.clear();
         this.state.weaponPickups.clear();
         this.velocities.clear();
+        this.bossAI = null;
+        this.combat.reset();
+    }
+    startWave(waveNumber) {
+        this.state.currentWave = waveNumber;
+        if (waveNumber === 5) {
+            this.spawnBoss();
+            return;
+        }
+        this.broadcast('WAVE_START', { wave: waveNumber });
+    }
+    spawnBoss() {
+        if (this.bossSpawned)
+            return;
+        this.bossSpawned = true;
+        this.bossAI = new BossAI_1.BossAI(this.state.boss, this.state.difficulty);
+        this.bossAI.spawn(this.state.players.size);
+        this.state.boss = Object.assign(this.state.boss, {
+            id: this.state.boss.id,
+            health: this.state.boss.health,
+            maxHealth: this.state.boss.maxHealth,
+            phase: this.state.boss.phase,
+            isActive: this.state.boss.isActive,
+            position: this.state.boss.position,
+            rotation: this.state.boss.rotation,
+        });
+        this.broadcast('BOSS_SPAWN', {
+            bossId: this.state.boss.id,
+            health: this.state.boss.health,
+            maxHealth: this.state.boss.maxHealth,
+        });
+    }
+    handleBossDefeated() {
+        if (this.bossDefeated)
+            return;
+        this.bossDefeated = true;
+        this.state.boss.isActive = false;
+        const damageLog = this.combat.resetDamageLog();
+        this.broadcast('BOSS_DEFEATED', {
+            bossId: this.state.boss.id,
+            damageLog: Object.fromEntries(damageLog),
+        });
+        setTimeout(() => {
+            this.state.phase = shared_2.RoomPhase.VICTORY;
+            this.broadcast('VICTORY', {
+                wave: this.state.currentWave,
+                elapsedTime: this.state.elapsedTime,
+            });
+        }, 3000);
     }
     serverTick(deltaTime) {
         if (this.state.phase !== shared_2.RoomPhase.GAME)
@@ -152,8 +255,33 @@ class GameRoom extends colyseus_1.Room {
             player.position.y = Math.max(-boundary, Math.min(boundary, player.position.y));
             player.position.z = Math.max(-boundary, Math.min(boundary, player.position.z));
             const hasInput = Math.abs(vel.x) > 0.01 || Math.abs(vel.y) > 0.01 || Math.abs(vel.z) > 0.01;
-            player.state = hasInput ? shared_2.PlayerState.RUNNING : shared_2.PlayerState.IDLE;
+            if (player.state !== shared_2.PlayerState.ATTACKING && player.state !== shared_2.PlayerState.DODGING) {
+                player.state = hasInput ? shared_2.PlayerState.RUNNING : shared_2.PlayerState.IDLE;
+            }
         });
+        if (this.state.boss.isActive && this.bossAI) {
+            this.bossAI.tick(deltaTime, this.state.players);
+            const bossResults = this.combat.handleBossAttackPlayers(this.state.boss, this.bossAI, this.state.players, performance.now());
+            for (const result of bossResults) {
+                const player = this.state.players.get(result.targetId);
+                if (player && result.isDead) {
+                    player.isAlive = false;
+                    player.state = shared_2.PlayerState.DEAD;
+                    player.health = 0;
+                    this.broadcast('PLAYER_DIED', {
+                        playerId: result.targetId,
+                        killedBy: 'boss',
+                    });
+                }
+                this.broadcast('PLAYER_DAMAGED', {
+                    targetId: result.targetId,
+                    damage: result.damage,
+                    isDead: result.isDead,
+                    knockbackX: result.knockbackX,
+                    knockbackZ: result.knockbackZ,
+                });
+            }
+        }
     }
 }
 exports.GameRoom = GameRoom;

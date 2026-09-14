@@ -252,6 +252,9 @@ export function LocalPlayer({ sessionId, color }: LocalPlayerProps) {
           isLocal
           weapon={weaponRef.current}
           weaponSwing={pose.attack}
+          playerState={pose.fallen ? 'dead' : pose.idle ? 'idle' : pose.speed > 7.5 ? 'running' : 'running'}
+          speed={pose.speed}
+          alive={!pose.fallen}
         />
       </group>
     </RigidBody>

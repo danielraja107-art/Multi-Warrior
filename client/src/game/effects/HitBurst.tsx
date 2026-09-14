@@ -18,6 +18,10 @@ interface ParticleState {
   maxLife: number;
 }
 
+const _dir = new THREE.Vector3();
+const _base = new THREE.Color();
+const _v = new THREE.Color();
+
 function createParticles(spec: BurstSpec): ParticleState[] {
   const count = spec.count ?? 12;
   const speed = (spec.power ?? 1) * 3;
@@ -25,15 +29,16 @@ function createParticles(spec: BurstSpec): ParticleState[] {
   for (let i = 0; i < count; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const dir = new THREE.Vector3(
+    _dir.set(
       Math.sin(phi) * Math.cos(theta),
       Math.abs(Math.cos(phi)) * 0.6 + 0.3,
       Math.sin(phi) * Math.sin(theta),
     ).normalize();
     const v = speed * (0.4 + Math.random() * 0.8);
+    _dir.multiplyScalar(v);
     particles.push({
       pos: new THREE.Vector3(spec.position[0], spec.position[1] + 0.3, spec.position[2]),
-      vel: dir.multiplyScalar(v),
+      vel: _dir.clone(),
       life: 0,
       maxLife: 0.35 + Math.random() * 0.3,
     });
@@ -41,10 +46,14 @@ function createParticles(spec: BurstSpec): ParticleState[] {
   return particles;
 }
 
-/**
- * One-shot particle burst. Manages its own particle attributes and
- * removes itself from the effects bus when finished.
- */
+const SIZE_MAP: Record<string, number> = {
+  shockwave: 0.14,
+  rain_impact: 0.05,
+  stick_crack: 0.07,
+  spawn_beacon: 0.09,
+  weapon_respawn: 0.08,
+};
+
 export function HitBurst({ spec }: HitBurstProps) {
   const particles = useMemo(() => createParticles(spec), [spec]);
   const posAttr = useMemo(() => {
@@ -59,14 +68,13 @@ export function HitBurst({ spec }: HitBurstProps) {
 
   const colAttr = useMemo(() => {
     const arr = new Float32Array(particles.length * 3);
-    const base = new THREE.Color(spec.color ?? '#ffffff');
+    _base.set(spec.color ?? '#ffffff');
     arr.fill(0);
-    const v = new THREE.Color();
     particles.forEach((_, i) => {
-      v.copy(base).multiplyScalar(0.45 + Math.random() * 0.55);
-      arr[i * 3] = v.r;
-      arr[i * 3 + 1] = v.g;
-      arr[i * 3 + 2] = v.b;
+      _v.copy(_base).multiplyScalar(0.45 + Math.random() * 0.55);
+      arr[i * 3] = _v.r;
+      arr[i * 3 + 1] = _v.g;
+      arr[i * 3 + 2] = _v.b;
     });
     return new THREE.BufferAttribute(arr, 3);
   }, [particles, spec.color]);
@@ -124,7 +132,7 @@ export function HitBurst({ spec }: HitBurstProps) {
     }
   });
 
-  const size = spec.kind === 'shockwave' ? 0.14 : 0.06;
+  const size = SIZE_MAP[spec.kind] ?? 0.06;
 
   return (
     <points>

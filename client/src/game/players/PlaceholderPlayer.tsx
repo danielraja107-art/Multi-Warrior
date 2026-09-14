@@ -6,6 +6,7 @@ import { PlayerColor, WeaponType } from '@storm-arena/shared';
 import { PlaceholderPose, defaultPose } from './pose';
 import { WeaponMesh } from '../weapons/WeaponMesh';
 import { WeaponTrail } from '../effects/WeaponTrail';
+import { PlayerModel } from './PlayerModel';
 
 interface PlaceholderPlayerProps {
   color: PlayerColor;
@@ -16,17 +17,32 @@ interface PlaceholderPlayerProps {
   weapon?: WeaponType;
   /** 0..1 current swing progress used to animate the held weapon. */
   weaponSwing?: number;
+  /** Server-controlled player state string. */
+  playerState?: string;
+  /** Movement speed for animation blending. */
+  speed?: number;
+  /** Whether the player is alive. */
+  alive?: boolean;
 }
 
 const ARM_FWD = 0.35;
 const LEG_SWING = 0.5;
 
 /**
- * Low-poly placeholder humanoid (1.8m tall) whose limbs animate from a
- * mutable PlaceholderPose. At y=0 feet touch the floor. Serves as the
- * visual fallback until real Mixamo GLB assets are integrated.
+ * Player renderer that supports both placeholder (procedural) and real GLB models.
+ * When playerState is provided, uses the real GLB with Mixamo animations.
+ * Otherwise falls back to the procedural placeholder.
  */
-export function PlaceholderPlayer({ color, poseRef, isLocal = false, weapon, weaponSwing = 0 }: PlaceholderPlayerProps) {
+export function PlaceholderPlayer({
+  color,
+  poseRef,
+  isLocal = false,
+  weapon,
+  weaponSwing = 0,
+  playerState,
+  speed = 0,
+  alive = true,
+}: PlaceholderPlayerProps) {
   const groupRef = useRef<Group>(null);
   const leftArmRef = useRef<Group>(null);
   const rightArmRef = useRef<Group>(null);
@@ -38,7 +54,11 @@ export function PlaceholderPlayer({ color, poseRef, isLocal = false, weapon, wea
 
   const pose = poseRef?.current ?? defaultPose();
 
+  const useRealModel = playerState !== undefined;
+
   useFrame((state, delta) => {
+    if (useRealModel) return;
+
     const group = groupRef.current;
     if (!group) return;
     const t = state.clock.elapsedTime;
@@ -98,6 +118,20 @@ export function PlaceholderPlayer({ color, poseRef, isLocal = false, weapon, wea
       group.position.y = bobY;
     }
   });
+
+  if (useRealModel) {
+    return (
+      <PlayerModel
+        color={color}
+        state={playerState}
+        speed={speed}
+        alive={alive}
+        weapon={weapon}
+        weaponSwing={weaponSwing}
+        isLocal={isLocal}
+      />
+    );
+  }
 
   const bodyColor = PLAYER_COLOR_HEX[color];
   const skin = '#dfb68b';
