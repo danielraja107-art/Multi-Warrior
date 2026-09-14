@@ -43,6 +43,13 @@ export enum RoomPhase {
   GAME_OVER = 'game_over',
 }
 
+export enum ConnectionStatus {
+  DISCONNECTED = 'disconnected',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  RECONNECTING = 'reconnecting',
+}
+
 export enum Difficulty {
   EASY = 'easy',
   NORMAL = 'normal',
@@ -84,6 +91,7 @@ export enum GameEvent {
   WAVE_COMPLETE = 'wave_complete',
   BOSS_SPAWN = 'boss_spawn',
   BOSS_PHASE_CHANGE = 'boss_phase_change',
+  BOSS_ATTACK = 'boss_attack',
   BOSS_DEFEATED = 'boss_defeated',
   PLAYER_DIED = 'player_died',
   PLAYER_KILLED = 'player_killed',

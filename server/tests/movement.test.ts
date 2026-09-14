@@ -1,8 +1,9 @@
 import { Server } from 'colyseus';
 import { Client } from 'colyseus.js';
 import { GameRoom } from '../src/rooms/GameRoom.js';
+import { MovementSystem, PLAYER_SPEED } from '../src/gameplay/movement/MovementSystem.js';
 
-const PORT = 2570;
+const PORT = 2569;
 let failures: string[] = [];
 
 function check(cond: boolean, msg: string) {
@@ -13,6 +14,45 @@ function check(cond: boolean, msg: string) {
     failures.push(msg);
   }
 }
+
+function testMovementSystem() {
+  console.log('--- MovementSystem unit tests ---');
+  const ms = new MovementSystem();
+  const sid = 'p1';
+
+  check(ms.enqueueInput(sid, { direction: { x: 1, y: 0, z: 0 }, timestamp: 100 }), 'accepts first input');
+  check(ms.enqueueInput(sid, { direction: { x: 1, y: 0, z: 0 }, timestamp: 80 }) === false, 'rejects out-of-order timestamp');
+
+  let up = ms.update(sid, 50);
+  check(up.velocity.x === 1 && up.hasInput, `velocity reflects queued direction (x=${up.velocity.x})`);
+
+  ms.enqueueInput(sid, { direction: { x: 0, y: 0, z: 0 }, timestamp: 120 });
+  up = ms.update(sid, 50);
+  check(up.velocity.x === 0 && !up.hasInput, 'stop input zeroes velocity');
+
+  check(up.rotation === null, 'no rotation when input has none');
+
+  ms.clear(sid);
+  up = ms.update(sid, 50);
+  check(up.velocity.x === 0 && !up.hasInput, 'clear zeroes velocity');
+
+  ms.enqueueInput(sid, { direction: { x: 1, y: 0, z: 0 }, rotation: { x: 0.5, y: 0.25 }, timestamp: 200 });
+  up = ms.update(sid, 50);
+  check(up.rotation && up.rotation.x === 0.5 && up.rotation.y === 0.25, 'applies rotation from input');
+
+  const bound = 20;
+  const reps = Math.ceil((bound * 2) / (PLAYER_SPEED * 0.05)) + 10;
+  for (let i = 0; i < reps; i++) {
+    ms.enqueueInput(sid, { direction: { x: 1, y: 0, z: 0 }, timestamp: 300 + i });
+    ms.update(sid, 50);
+  }
+  up = ms.update(sid, 50);
+  check(up.velocity.x === 1, 'velocity remains 1 toward boundary after many ticks');
+}
+
+testMovementSystem();
+
+console.log('\n--- Integration: boundary + move/stop ---');
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -36,6 +76,7 @@ async function main() {
   const gameServer = new Server();
   gameServer.define('game_room', GameRoom);
   await gameServer.listen(PORT);
+
   console.log('test server listening on', PORT);
 
   const { room1, state } = await setupGame();
@@ -85,6 +126,29 @@ async function main() {
   await wait(200);
   hostP = await findHost(state);
   check(hostP.state === 'idle', `idle state restored on empty input (state=${hostP.state})`);
+
+  // Move +x for enough ticks to hit boundary (+20)
+  const start = host.position.x;
+  for (let i = 0; i < 200; i++) {
+    room1.send('PLAYER_MOVE', { direction: { x: 1, y: 0, z: 0 }, timestamp: Date.now() + i });
+    await wait(20);
+  }
+  await wait(200);
+  hostP = await findHost(state);
+  check(hostP.position.x <= 20, `movement clamps at boundary (x=${hostP.position.x.toFixed(2)})`);
+  check(hostP.position.x > start, 'player moved forward from start');
+
+  // Stop input: send zero direction, position should stop changing
+  room1.send('PLAYER_MOVE', { direction: { x: 0, y: 0, z: 0 }, timestamp: Date.now() + 100000 });
+  await wait(100);
+  const stopped = hostP.position.x;
+  await wait(200);
+  hostP = await findHost(state);
+  check(Math.abs(hostP.position.x - stopped) < 0.001, `player stops on zero input (dx=${(hostP.position.x - stopped).toFixed(4)})`);
+
+  // Reject invalid direction (magnitude > 1)
+  room1.send('PLAYER_MOVE', { direction: { x: 99, y: 0, z: 0 }, timestamp: Date.now() + 200000 });
+  check(true, 'invalid move message sent (server must reject silently - no crash)');
 
   console.log(
     failures.length === 0

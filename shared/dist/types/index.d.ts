@@ -38,6 +38,12 @@ export declare enum RoomPhase {
     VICTORY = "victory",
     GAME_OVER = "game_over"
 }
+export declare enum ConnectionStatus {
+    DISCONNECTED = "disconnected",
+    CONNECTING = "connecting",
+    CONNECTED = "connected",
+    RECONNECTING = "reconnecting"
+}
 export declare enum Difficulty {
     EASY = "easy",
     NORMAL = "normal",

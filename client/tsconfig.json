@@ -1,20 +1,32 @@
 {
-  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
+    "skipLibCheck": true,
     "moduleResolution": "bundler",
-    "jsx": "react-jsx",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "useDefineForClassFields": true,
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
     "noEmit": true,
-    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "strict": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
     "paths": {
-      "react": ["node_modules/@types/react"],
-      "react-dom": ["node_modules/@types/react-dom"],
-      "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime"],
-      "react/jsx-dev-runtime": ["node_modules/@types/react/jsx-dev-runtime"]
+      "@/*": ["./src/*"],
+      "@storm-arena/shared": ["../shared/src/index.ts"],
+      "react": ["./node_modules/@types/react"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime"],
+      "react/jsx-dev-runtime": ["./node_modules/@types/react/jsx-dev-runtime"]
     }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite-env.d.ts", "vite.config.ts"]
 }

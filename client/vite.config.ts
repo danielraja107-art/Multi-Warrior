@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@storm-arena/shared': fileURLToPath(
         new URL('../shared/src/index.ts', import.meta.url),
       ),
@@ -18,6 +19,10 @@ export default defineConfig({
       '/matchmake': {
         target: 'ws://localhost:2567',
         ws: true,
+      },
+      '/api': {
+        target: 'http://localhost:2567',
+        changeOrigin: true,
       },
     },
   },

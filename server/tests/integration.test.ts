@@ -22,9 +22,11 @@ async function main() {
 
   const client1 = new Client(`ws://localhost:${PORT}`);
   const room1 = await client1.joinOrCreate('game_room');
+  room1.onMessage('GAME_EVENT', () => {});
 
   const client2 = new Client(`ws://localhost:${PORT}`);
   const room2 = await client2.joinOrCreate('game_room');
+  room2.onMessage('GAME_EVENT', () => {});
 
   await new Promise((r) => setTimeout(r, 300));
   const st: any = room1.state;
@@ -39,7 +41,10 @@ async function main() {
   const host = players.find((p: any) => p.isHost);
   check(!!host, 'a host exists');
   const colors = players.map((p: any) => p.color).sort();
-  check(JSON.stringify(colors) === JSON.stringify(['blue', 'red']), `distinct colors assigned (${colors.join(',')})`);
+  check(
+    JSON.stringify(colors) === JSON.stringify(['blue', 'red']),
+    `distinct colors assigned (${colors.join(',')})`,
+  );
 
   check(st.difficulty === 'normal', 'default difficulty normal');
 
@@ -55,7 +60,10 @@ async function main() {
 
   const hostPlayer = [...st.players.values()].find((p: any) => p.isHost);
   const moved = hostPlayer && hostPlayer.position.x > -5 + 1e-4;
-  check(!!moved, `server-authoritative game movement applied (x=${hostPlayer?.position.x?.toFixed(2)})`);
+  check(
+    !!moved,
+    `server-authoritative game movement applied (x=${hostPlayer?.position.x?.toFixed(2)})`,
+  );
 
   console.log(failures.length === 0 ? '\nALL TESTS PASSED' : `\n${failures.length} TESTS FAILED`);
   room1.leave();
