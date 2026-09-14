@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, memo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group } from 'three';
 import { WeaponType } from '@storm-arena/shared';
@@ -9,7 +9,7 @@ interface WeaponPickupProps {
   pickup: ClientWeaponPickupState;
 }
 
-export function WeaponPickup({ pickup }: WeaponPickupProps) {
+export const WeaponPickup = memo(function WeaponPickup({ pickup }: WeaponPickupProps) {
   const groupRef = useRef<Group>(null);
   const available = useGameStore(
     (s) => s.weaponPickups[pickup.id]?.isAvailable ?? pickup.isAvailable,
@@ -36,7 +36,7 @@ export function WeaponPickup({ pickup }: WeaponPickupProps) {
       </mesh>
     </group>
   );
-}
+});
 
 export function WeaponPickupLayer() {
   const pickups = useGameStore((s) => s.weaponPickups);

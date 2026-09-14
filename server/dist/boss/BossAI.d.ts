@@ -1,0 +1,60 @@
+import { Boss, Player } from '@storm-arena/shared';
+export declare class BossAI {
+    private boss;
+    private config;
+    private state;
+    private targetPlayerId;
+    private lastAttackTime;
+    private lastSweepTime;
+    private lastSlamTime;
+    private lastSpinTime;
+    private lastGrabTime;
+    private lastRoarTime;
+    private lastChargeTime;
+    private attackAnimating;
+    private attackAnimTimer;
+    private chargeAnimating;
+    private chargeTimer;
+    private chargeDir;
+    private phaseTransitionPending;
+    private phaseTransitionTimer;
+    private now;
+    constructor(boss: Boss, difficulty: string);
+    spawn(playerCount: number): void;
+    tick(deltaMs: number, players: Map<string, Player>): void;
+    private tickNormal;
+    private tickEnraged;
+    private pickAttack;
+    private executeAttack;
+    private startCharge;
+    private tickCharge;
+    private moveToward;
+    private faceTarget;
+    private faceForward;
+    private selectTarget;
+    private updatePhase;
+    private triggerPhaseTransition;
+    private handleDeath;
+    private canPunch;
+    private canSweep;
+    private canSlam;
+    private canSpin;
+    private canGrab;
+    private canRoar;
+    private canCharge;
+    getAttackHitbox(): {
+        x: number;
+        z: number;
+        radius: number;
+        damage: number;
+        type: string;
+    } | null;
+    getChargeHitbox(): {
+        x: number;
+        z: number;
+        radius: number;
+        damage: number;
+    } | null;
+    isAttackActive(): boolean;
+}
+//# sourceMappingURL=BossAI.d.ts.map

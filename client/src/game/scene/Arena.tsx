@@ -1,8 +1,13 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { emitBurst } from '../effects/effectsBus';
 
 const ARENA_HALF = 24;
+/** How many rain drops hit the ground and emit a splash per tick. */
+const RAIN_IMPACT_RATE = 3;
+/** Min ms between impact burst emissions. */
+const IMPACT_EMIT_INTERVAL = 80;
 
 interface RainProps {
   intensity: number;
@@ -11,6 +16,7 @@ interface RainProps {
 function Rain({ intensity }: RainProps) {
   const ref = useRef<THREE.Points>(null);
   const count = Math.round(intensity * 450);
+  const impactTimer = useRef(0);
 
   const positions = useMemo(() => {
     const arr = new Float32Array(count * 3);
@@ -32,10 +38,33 @@ function Rain({ intensity }: RainProps) {
     if (!pts) return;
     const pos = pts.geometry.attributes.position as THREE.BufferAttribute;
     const arr = pos.array as Float32Array;
+    let impactsThisFrame = 0;
+    impactTimer.current += delta * 1000;
+
     for (let i = 0; i < count; i++) {
       arr[i * 3 + 1] -= speeds[i] * delta * 60 * 0.05;
       arr[i * 3] -= speeds[i] * delta * 60 * 0.008;
       if (arr[i * 3 + 1] < 0) {
+        // Rain drop hit the ground — emit a splash
+        if (
+          impactsThisFrame < RAIN_IMPACT_RATE &&
+          impactTimer.current > IMPACT_EMIT_INTERVAL
+        ) {
+          const ix = arr[i * 3];
+          const iz = arr[i * 3 + 2];
+          // Only emit inside the arena
+          if (Math.abs(ix) < ARENA_HALF && Math.abs(iz) < ARENA_HALF) {
+            emitBurst('rain_impact', [ix, 0.02, iz], {
+              color: '#8ab8d8',
+              count: 3,
+              power: 0.2,
+            });
+            impactsThisFrame++;
+            if (impactsThisFrame >= RAIN_IMPACT_RATE) {
+              impactTimer.current = 0;
+            }
+          }
+        }
         arr[i * 3 + 1] = 14 + Math.random() * 2;
         arr[i * 3] = (Math.random() - 0.5) * (ARENA_HALF * 2 + 20);
         arr[i * 3 + 2] = (Math.random() - 0.5) * (ARENA_HALF * 2 + 20);

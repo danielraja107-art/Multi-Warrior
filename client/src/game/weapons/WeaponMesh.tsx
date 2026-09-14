@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group } from 'three';
 import { WeaponType } from '@storm-arena/shared';
+import { emitBurst } from '../effects/effectsBus';
 
 interface WeaponMeshProps {
   type: WeaponType;
@@ -10,6 +11,8 @@ interface WeaponMeshProps {
   /** Swing handedness: +1 right, -1 left. */
   handedness?: number;
   scale?: number;
+  /** World-space position of the weapon tip for impact emission. */
+  worldPos?: [number, number, number];
 }
 
 const WOOD = '#8a5a2b';
@@ -23,9 +26,10 @@ const ROCK = '#6f7378';
  * These are replaced by GLB models once the asset pipeline is complete.
  * The root group is centered at the gripping hand.
  */
-export function WeaponMesh({ type, swing = 0, handedness = 1, scale = 1 }: WeaponMeshProps) {
+export function WeaponMesh({ type, swing = 0, handedness = 1, scale = 1, worldPos }: WeaponMeshProps) {
   const groupRef = useRef<Group>(null);
   const rotRef = useRef(0);
+  const peakEmitted = useRef(false);
 
   useFrame((_, delta) => {
     const group = groupRef.current;
@@ -33,8 +37,16 @@ export function WeaponMesh({ type, swing = 0, handedness = 1, scale = 1 }: Weapo
     if (swing > 0 && swing < 1) {
       const target = -handedness * (0.2 + swing * 2.4);
       rotRef.current += (target - rotRef.current) * Math.min(1, 18 * delta);
+
+      // Emit stick-crack impact at peak of swing (around swing ~0.5)
+      if (type === WeaponType.STICK && swing > 0.45 && swing < 0.55 && !peakEmitted.current) {
+        peakEmitted.current = true;
+        const pos = worldPos ?? [0, 1, 0];
+        emitBurst('stick_crack', pos, { color: '#c8a060', count: 8, power: 0.7 });
+      }
     } else {
       rotRef.current += (0 - rotRef.current) * Math.min(1, 10 * delta);
+      if (swing === 0) peakEmitted.current = false;
     }
     group.rotation.x = rotRef.current;
   });

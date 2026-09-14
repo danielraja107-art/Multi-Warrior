@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useMemo, memo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Vector3, Quaternion, Euler, type Group } from 'three';
 import { Html } from '@react-three/drei';
@@ -24,12 +24,12 @@ interface EnemyProps {
   enemy: ClientEnemyState;
 }
 
-export function Enemy({ enemy }: EnemyProps) {
+export const Enemy = memo(function Enemy({ enemy }: EnemyProps) {
   const groupRef = useRef<Group>(null);
   const armRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
   const current = useRef(new Vector3(enemy.position.x, enemy.position.y, enemy.position.z));
-  const style = ENEMY_STYLE[enemy.type] ?? ENEMY_STYLE[EnemyType.BASIC];
+  const style = useMemo(() => ENEMY_STYLE[enemy.type] ?? ENEMY_STYLE[EnemyType.BASIC], [enemy.type]);
 
   const wasAlive = useRef(true);
   const spawned = useRef(false);
@@ -157,7 +157,7 @@ export function Enemy({ enemy }: EnemyProps) {
       )}
     </>
   );
-}
+});
 
 export function EnemyLayer() {
   const enemies = useGameStore((s) => s.enemies);
