@@ -1,6 +1,19 @@
 import { Room, Client } from 'colyseus';
-import { GameState, Player, Enemy } from '@storm-arena/shared';
-import { RoomPhase, Difficulty, PlayerColor, PlayerState, WeaponType, EnemyType, EnemyState, GameEvent, MESSAGE_CLIENT, MESSAGE_SERVER } from '@storm-arena/shared';
+import { GameState, Player, Enemy, Boss } from '@storm-arena/shared';
+import {
+  RoomPhase,
+  Difficulty,
+  PlayerColor,
+  PlayerState,
+  WeaponType,
+  EnemyType,
+  EnemyState,
+  GameEvent,
+  AttackType,
+  BossPhase,
+  MESSAGE_CLIENT,
+  MESSAGE_SERVER,
+} from '@storm-arena/shared';
 import { MovementSystem, PLAYER_SPEED, MOVEMENT_BOUNDARY, MovementInput } from '../gameplay/movement/MovementSystem';
 import { CombatManager } from '../gameplay/combat/CombatManager';
 import { WeaponSystem } from '../gameplay/weapons/WeaponSystem';
@@ -9,6 +22,8 @@ import { WaveDirector } from '../gameplay/waves/WaveDirector';
 import { SpawnManager } from '../gameplay/waves/SpawnManager';
 import { EnemySystem } from '../gameplay/enemies/EnemySystem';
 import { BossSystem } from '../gameplay/bosses/BossSystem';
+import { BossAI } from '../boss/BossAI';
+import { CombatSystem } from '../boss/CombatSystem';
 
 const PLAYER_COLORS: PlayerColor[] = [
   PlayerColor.RED,
@@ -40,6 +55,10 @@ export class GameRoom extends Room<GameState> {
   private bossSystem = new BossSystem(this);
   private spawnManager = new SpawnManager(this, this.enemySystem);
   private waveDirector = new WaveDirector(this, this.enemySystem, this.weapons, this.bossSystem);
+  private bossAI: BossAI | null = null;
+  private bossCombat = new CombatSystem();
+  private bossSpawned = false;
+  private bossDefeated = false;
 
   onCreate(options: { difficulty?: string }) {
     this.setState(new GameState());
@@ -187,6 +206,8 @@ export class GameRoom extends Room<GameState> {
     this.movement.clearAll();
     this.weapons.clearAll();
     this.projectiles.clearAll();
+    this.bossAI = null;
+    this.bossCombat.reset();
   }
 
   private normalizeMoveInput(input: MovementInput): MovementInput | null {
@@ -239,6 +260,63 @@ export class GameRoom extends Room<GameState> {
     return speed > PLAYER_SPEED * 4.5;
   }
 
+  private startWave(waveNumber: number): void {
+    this.state.currentWave = waveNumber;
+
+    if (waveNumber === 5) {
+      this.spawnBoss();
+      return;
+    }
+
+    this.broadcast('WAVE_START', { wave: waveNumber });
+  }
+
+  private spawnBoss(): void {
+    if (this.bossSpawned) return;
+    this.bossSpawned = true;
+
+    this.bossAI = new BossAI(this.state.boss, this.state.difficulty);
+    this.bossAI.spawn(this.state.players.size);
+
+    this.state.boss = Object.assign(this.state.boss, {
+      id: this.state.boss.id,
+      health: this.state.boss.health,
+      maxHealth: this.state.boss.maxHealth,
+      phase: this.state.boss.phase,
+      isActive: this.state.boss.isActive,
+      position: this.state.boss.position,
+      rotation: this.state.boss.rotation,
+    });
+
+    this.broadcast('BOSS_SPAWN', {
+      bossId: this.state.boss.id,
+      health: this.state.boss.health,
+      maxHealth: this.state.boss.maxHealth,
+    });
+  }
+
+  private handleBossDefeated(): void {
+    if (this.bossDefeated) return;
+    this.bossDefeated = true;
+
+    this.state.boss.isActive = false;
+
+    const damageLog = this.bossCombat.resetDamageLog();
+
+    this.broadcast('BOSS_DEFEATED', {
+      bossId: this.state.boss.id,
+      damageLog: Object.fromEntries(damageLog),
+    });
+
+    setTimeout(() => {
+      this.state.phase = RoomPhase.VICTORY;
+      this.broadcast('VICTORY', {
+        wave: this.state.currentWave,
+        elapsedTime: this.state.elapsedTime,
+      });
+    }, 3000);
+  }
+
   private serverTick(deltaTime: number) {
     if (this.state.phase !== RoomPhase.GAME) return;
 
@@ -278,5 +356,38 @@ export class GameRoom extends Room<GameState> {
     this.projectiles.update(deltaTime);
     this.enemySystem.update(deltaTime);
     this.bossSystem.update(deltaTime);
+
+    if (this.state.boss.isActive && this.bossAI) {
+      this.bossAI.tick(deltaTime, this.state.players);
+
+      const bossResults = this.bossCombat.handleBossAttackPlayers(
+        this.state.boss,
+        this.bossAI,
+        this.state.players,
+        performance.now(),
+      );
+
+      for (const result of bossResults) {
+        const player = this.state.players.get(result.targetId);
+        if (player && result.isDead) {
+          player.isAlive = false;
+          player.state = PlayerState.DEAD;
+          player.health = 0;
+
+          this.broadcast('PLAYER_DIED', {
+            playerId: result.targetId,
+            killedBy: 'boss',
+          });
+        }
+
+        this.broadcast('PLAYER_DAMAGED', {
+          targetId: result.targetId,
+          damage: result.damage,
+          isDead: result.isDead,
+          knockbackX: result.knockbackX,
+          knockbackZ: result.knockbackZ,
+        });
+      }
+    }
   }
 }

@@ -10,7 +10,12 @@ export type EffectKind =
   | 'impact'
   | 'enemy_death'
   | 'boss_phase'
-  | 'lightning_flash';
+  | 'lightning_flash'
+  | 'stick_crack'
+  | 'rain_impact'
+  | 'spawn_beacon'
+  | 'rest_glow'
+  | 'weapon_respawn';
 
 export interface BurstSpec {
   id: number;
@@ -21,10 +26,28 @@ export interface BurstSpec {
   power?: number;
 }
 
-const MAX_BURSTS = 48;
+const MAX_BURSTS = 32;
 let nextId = 1;
 let bursts: BurstSpec[] = [];
 const listeners = new Set<() => void>();
+
+const burstPool: BurstSpec[] = [];
+
+function acquireBurst(): BurstSpec {
+  if (burstPool.length > 0) {
+    return burstPool.pop()!;
+  }
+  return { id: 0, kind: 'spark', position: [0, 0, 0] };
+}
+
+function releaseBurst(spec: BurstSpec): void {
+  spec.color = undefined;
+  spec.count = undefined;
+  spec.power = undefined;
+  if (burstPool.length < 64) {
+    burstPool.push(spec);
+  }
+}
 
 function notify() {
   for (const cb of listeners) cb();
@@ -36,24 +59,32 @@ export function emitBurst(
   opts?: { color?: string; count?: number; power?: number },
 ): number {
   const id = nextId++;
-  const spec: BurstSpec = {
-    id,
-    kind,
-    position,
-    color: opts?.color,
-    count: opts?.count,
-    power: opts?.power,
-  };
-  bursts.push(spec);
-  if (bursts.length > MAX_BURSTS) {
-    bursts = bursts.slice(bursts.length - MAX_BURSTS);
+  const spec = acquireBurst();
+  spec.id = id;
+  spec.kind = kind;
+  spec.position[0] = position[0];
+  spec.position[1] = position[1];
+  spec.position[2] = position[2];
+  spec.color = opts?.color;
+  spec.count = opts?.count;
+  spec.power = opts?.power;
+  if (bursts.length >= MAX_BURSTS) {
+    releaseBurst(bursts[0]);
+    bursts = [...bursts.slice(1), spec];
+  } else {
+    bursts = [...bursts, spec];
   }
   notify();
   return id;
 }
 
 export function removeBurst(id: number) {
-  bursts = bursts.filter((b) => b.id !== id);
+  const idx = bursts.findIndex((b) => b.id === id);
+  if (idx !== -1) {
+    const removed = bursts[idx];
+    bursts = bursts.filter((b) => b.id !== id);
+    releaseBurst(removed);
+  }
   notify();
 }
 
@@ -69,6 +100,9 @@ export function subscribeBursts(cb: () => void): () => void {
 }
 
 export function clearBursts() {
+  for (const b of bursts) {
+    releaseBurst(b);
+  }
   bursts = [];
   notify();
 }
@@ -86,4 +120,9 @@ export const EFFECT_COLORS: Record<EffectKind, string> = {
   enemy_death: '#a33a3a',
   boss_phase: '#ff5a3a',
   lightning_flash: '#e8f2ff',
+  stick_crack: '#c8a060',
+  rain_impact: '#8ab8d8',
+  spawn_beacon: '#42d0ff',
+  rest_glow: '#4a8aff',
+  weapon_respawn: '#ffdd44',
 };

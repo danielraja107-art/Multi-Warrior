@@ -1,7 +1,11 @@
 import { useMemo, useRef, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { Group, Mesh, MeshStandardMaterial, Color } from 'three';
+import { Group, Mesh, MeshStandardMaterial, Color, type Object3D } from 'three';
+import { AnimationController } from '../players/AnimationController';
+import {
+  mapBossStateToClip,
+  type BossActionFeed,
+} from '../players/animations';
 
 const BOSS_MODEL_URL = '/assets/bosses/boss.glb';
 
@@ -25,19 +29,49 @@ interface BossModelProps {
   phase: string;
   isEnraged: boolean;
   currentAttack: string;
+  health: number;
+  maxHealth: number;
+  isActive: boolean;
+  speed: number;
 }
 
 /**
- * Mounts the real villain GLB (static mesh, textured) with phase/enrage
- * emissive tinting and lightweight procedural motion pending the rigged,
- * animated build. Falls back to a procedural figure if the GLB cannot load.
+ * Renders the boss GLB with Mixamo animation clips.
+ * Expects the GLB to contain these named animation clips:
+ *   idle, walk, attack_heavy_punch, attack_sweep, roar,
+ *   phase2_transition, attack_charge, attack_slam,
+ *   phase3_transition, attack_spin, attack_grab_throw,
+ *   enrage, death
+ *
+ * Phase-driven emissive tinting and shadow setup are applied on mount.
  */
-export function BossModel({ phase, isEnraged, currentAttack }: BossModelProps) {
+export function BossModel({
+  phase,
+  isEnraged,
+  currentAttack,
+  health,
+  maxHealth,
+  isActive,
+  speed,
+}: BossModelProps) {
   const gltf = useGLTF(BOSS_MODEL_URL);
   const rootRef = useRef<Group>(null);
 
   const tint = BOSS_TINTS[phase] ?? BOSS_TINTS.phase_1;
-  const speedScale = isEnraged ? 1.6 : 1;
+
+  const animRequest = useMemo(() => {
+    const feed: BossActionFeed = {
+      phase,
+      currentAttack,
+      isEnraged,
+      isActive,
+      health,
+      maxHealth,
+      speed,
+    };
+    const { clip, oneShot, rate } = mapBossStateToClip(feed);
+    return { key: clip, oneShot, speed: rate };
+  }, [phase, currentAttack, isEnraged, isActive, health, maxHealth, speed]);
 
   const model = useMemo(() => {
     const root = gltf.scene.clone(true);
@@ -85,23 +119,6 @@ export function BossModel({ phase, isEnraged, currentAttack }: BossModelProps) {
     });
   }, [model, tint, isEnraged]);
 
-  useFrame((_, delta) => {
-    const root = rootRef.current;
-    if (!root || !model) return;
-
-    const t = performance.now() * 0.001;
-    if (currentAttack) {
-      const lunge = (1 - Math.abs(Math.sin(t * 6 * speedScale))) * 0.22;
-      root.rotation.x = lunge;
-      root.position.z = -lunge * 0.4;
-    } else {
-      root.rotation.x = 0;
-      root.position.z = 0;
-      root.position.y = Math.sin(t * 1.2) * 0.04;
-      root.rotation.z = Math.sin(t * 0.7) * 0.02 * speedScale;
-    }
-  });
-
   if (!model) {
     return (
       <group ref={rootRef} position={[0, 0.6, 0]} scale={2.1}>
@@ -111,7 +128,12 @@ export function BossModel({ phase, isEnraged, currentAttack }: BossModelProps) {
         </mesh>
         <mesh position={[0, 1.28, 0]} castShadow>
           <sphereGeometry args={[0.4, 18, 18]} />
-          <meshStandardMaterial color="#241720" roughness={0.5} emissive={tint.emissive} emissiveIntensity={isEnraged ? 0.7 : 0.25} />
+          <meshStandardMaterial
+            color="#241720"
+            roughness={0.5}
+            emissive={tint.emissive}
+            emissiveIntensity={isEnraged ? 0.7 : 0.25}
+          />
         </mesh>
       </group>
     );
@@ -120,6 +142,11 @@ export function BossModel({ phase, isEnraged, currentAttack }: BossModelProps) {
   return (
     <group ref={rootRef} position={[0, 0, 0]} scale={2.1}>
       <primitive object={model} />
+      <AnimationController
+        gltf={gltf}
+        request={animRequest}
+        fade={0.2}
+      />
     </group>
   );
 }

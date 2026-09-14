@@ -70,6 +70,9 @@ export function RemotePlayer({ player }: RemotePlayerProps) {
           poseRef={{ current: pose }}
           weapon={player.weapon}
           weaponSwing={0}
+          playerState={player.state}
+          speed={pose.speed}
+          alive={player.isAlive}
         />
         {player.isHost && (
           <mesh position={[0, 2.2, 0]}>

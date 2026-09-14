@@ -76,6 +76,12 @@ interface ColyseusState {
 
 let syncRoom: Room | null = null;
 
+/** Reconnect state — tracks the last known room ID for reconnect attempts. */
+let lastRoomId: string | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAY_MS = 2000;
+
 function bindMeta(state: ColyseusState) {
   const localSessionId = useGameStore.getState().localSessionId;
   const local = localSessionId ? state.players.get(localSessionId) : undefined;
@@ -115,6 +121,9 @@ function applyFullSync(state: ColyseusState) {
 
 export function attachRoom(room: Room<any>, localSessionId: string) {
   syncRoom = room;
+  lastRoomId = room.roomId ?? null;
+  reconnectAttempts = 0;
+
   useGameStore.getState().setLocalSessionId(localSessionId);
   useGameStore.getState().setConnectionStatus('connected');
 
@@ -176,9 +185,72 @@ export function attachRoom(room: Room<any>, localSessionId: string) {
     console.error('[server error]', payload.code, payload.message);
   });
 
-  room.onLeave((_code: number) => {
-    useGameStore.getState().setConnectionStatus('disconnected');
+  room.onLeave((code: number) => {
+    const store = useGameStore.getState();
+    // 1000 = normal close, 4000+ = server kicked; 1001/1006 = abnormal disconnect
+    const isAbnormal = code !== 1000 && code < 4000;
+    if (isAbnormal && lastRoomId && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      store.setConnectionStatus('connecting');
+      scheduleReconnect();
+    } else {
+      store.setConnectionStatus('disconnected');
+    }
   });
+}
+
+function scheduleReconnect() {
+  reconnectAttempts++;
+  const delay = RECONNECT_DELAY_MS * reconnectAttempts;
+  console.info(`[reconnect] attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
+  setTimeout(async () => {
+    if (!lastRoomId) return;
+    try {
+      const { default: Colyseus } = await import('colyseus.js');
+      const SERVER_URL =
+        (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SERVER_URL ??
+        'ws://localhost:2567';
+      const client = new Colyseus.Client(SERVER_URL);
+      const room = await client.reconnect(lastRoomId);
+      attachRoom(room, room.sessionId);
+      reconnectAttempts = 0;
+      console.info('[reconnect] success');
+    } catch (err) {
+      console.warn('[reconnect] failed:', err);
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        scheduleReconnect();
+      } else {
+        useGameStore.getState().setConnectionStatus('disconnected', 'Reconnect failed');
+      }
+    }
+  }, delay);
+}
+
+/** Handle player respawn: play sound + emit visual burst at respawn location. */
+function handlePlayerRespawn(data: Record<string, unknown>) {
+  const store = useGameStore.getState();
+  playSound('player_respawn');
+
+  // If the server sends the respawn position, emit a burst there
+  if (
+    data.position &&
+    typeof (data.position as Record<string, number>).x === 'number'
+  ) {
+    const pos = data.position as { x: number; y: number; z: number };
+    emitBurst('spark', [pos.x, pos.y + 0.3, pos.z], {
+      color: '#7ff0ff',
+      count: 14,
+      power: 1.0,
+    });
+  }
+
+  // Update player alive state from store if available
+  const sessionId = data.sessionId as string | undefined;
+  if (sessionId) {
+    const player = store.players[sessionId];
+    if (player) {
+      store.upsertPlayer({ ...player, isAlive: true, health: player.maxHealth });
+    }
+  }
 }
 
 function handleGameEvent(payload: GameEventPayload) {
@@ -212,6 +284,9 @@ function handleGameEvent(payload: GameEventPayload) {
     case GameEvent.PLAYER_DIED:
       playSound('player_death');
       break;
+    case 'player_respawn' as string:
+      handlePlayerRespawn(data);
+      break;
     case GameEvent.PLAYER_KILLED:
       playSound('enemy_death');
       break;
@@ -241,6 +316,8 @@ export function detachRoom() {
     }
     syncRoom = null;
   }
+  lastRoomId = null;
+  reconnectAttempts = 0;
   const store = useGameStore.getState();
   store.setConnectionStatus('idle');
   store.setLocalSessionId(null);

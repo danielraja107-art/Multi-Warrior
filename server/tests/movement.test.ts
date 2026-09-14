@@ -3,7 +3,9 @@ import { Client } from 'colyseus.js';
 import { GameRoom } from '../src/rooms/GameRoom.js';
 import { MovementSystem, PLAYER_SPEED } from '../src/gameplay/movement/MovementSystem.js';
 
+const PORT = 2569;
 let failures: string[] = [];
+
 function check(cond: boolean, msg: string) {
   if (cond) {
     console.log('  PASS:', msg);
@@ -51,60 +53,114 @@ function testMovementSystem() {
 testMovementSystem();
 
 console.log('\n--- Integration: boundary + move/stop ---');
-const PORT = 2569;
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function setupGame(): Promise<{ room1: any; state: any }> {
+  const client1 = new Client(`ws://localhost:${PORT}`);
+  const room1 = await client1.joinOrCreate('game_room');
+  const client2 = new Client(`ws://localhost:${PORT}`);
+  await client2.joinOrCreate('game_room');
+  await wait(200);
+
+  room1.send('HOST_START', {});
+  await wait(200);
+  return { room1, state: room1.state };
+}
+
+async function findHost(state: any): Promise<any> {
+  return [...state.players.values()].find((p: any) => p.isHost);
+}
 
 async function main() {
   const gameServer = new Server();
   gameServer.define('game_room', GameRoom);
   await gameServer.listen(PORT);
 
-  const c1 = new Client(`ws://localhost:${PORT}`);
-  const room1 = await c1.joinOrCreate('game_room');
-  const c2 = new Client(`ws://localhost:${PORT}`);
-  const room2 = await c2.joinOrCreate('game_room');
+  console.log('test server listening on', PORT);
 
-  await new Promise((r) => setTimeout(r, 200));
+  const { room1, state } = await setupGame();
+  const host = await findHost(state);
+  const startX = host.position.x;
+  check(startX === -5, `host spawns at x=-5 (x=${startX})`);
 
-  room1.send('HOST_START', {});
-  await new Promise((r) => setTimeout(r, 150));
+  room1.send('PLAYER_MOVE', { direction: { x: 0, y: 0, z: 0 }, timestamp: Date.now() });
+  await wait(300);
+  let hostP = await findHost(state);
+  check(Math.abs(hostP.position.x - startX) < 1e-3, 'zero input produces no movement');
 
-  let st: any = room1.state;
-  let host: any = [...st.players.values()].find((p: any) => p.isHost);
+  room1.send('PLAYER_MOVE', { direction: { x: 5, y: 0, z: 0 }, timestamp: Date.now() });
+  await wait(300);
+  hostP = await findHost(state);
+  check(
+    Math.abs(hostP.position.x - startX) < 1e-3,
+    'over-normalized direction (magnitude 5) rejected',
+  );
+
+  room1.send('PLAYER_MOVE', { direction: { x: Number.NaN, y: 0, z: 0 }, timestamp: Date.now() });
+  await wait(300);
+  hostP = await findHost(state);
+  check(Math.abs(hostP.position.x - startX) < 1e-3, 'non-finite direction rejected');
+
+  room1.send('PLAYER_MOVE', { direction: { x: -1, y: 0, z: 0 }, timestamp: Date.now() });
+  await wait(3600);
+  hostP = await findHost(state);
+  check(
+    Math.abs(hostP.position.x - -20) < 0.5,
+    `movement clamped at negative boundary (x=${hostP.position.x.toFixed(2)})`,
+  );
+
+  const atBoundary = hostP.position.x;
+  room1.send('PLAYER_MOVE', { direction: { x: -1, y: 0, z: 0 }, timestamp: Date.now() });
+  await wait(700);
+  hostP = await findHost(state);
+  check(Math.abs(hostP.position.x - atBoundary) < 1e-3, 'player cannot move past boundary');
+
+  room1.send('PLAYER_MOVE', { direction: { x: 1, y: 0, z: 0 }, timestamp: Date.now() });
+  await wait(200);
+  hostP = await findHost(state);
+  const stateLabel = hostP.state;
+  check(stateLabel === 'running', `running state set on valid input (state=${stateLabel})`);
+
+  room1.send('PLAYER_MOVE', { direction: { x: 0, y: 0, z: 0 }, timestamp: Date.now() });
+  await wait(200);
+  hostP = await findHost(state);
+  check(hostP.state === 'idle', `idle state restored on empty input (state=${hostP.state})`);
 
   // Move +x for enough ticks to hit boundary (+20)
   const start = host.position.x;
   for (let i = 0; i < 200; i++) {
     room1.send('PLAYER_MOVE', { direction: { x: 1, y: 0, z: 0 }, timestamp: Date.now() + i });
-    await new Promise((r) => setTimeout(r, 20));
+    await wait(20);
   }
-  await new Promise((r) => setTimeout(r, 200));
-  st = room1.state;
-  host = [...st.players.values()].find((p: any) => p.isHost);
-  check(host.position.x <= 20, `movement clamps at boundary (x=${host.position.x.toFixed(2)})`);
-  check(host.position.x > start, 'player moved forward from start');
+  await wait(200);
+  hostP = await findHost(state);
+  check(hostP.position.x <= 20, `movement clamps at boundary (x=${hostP.position.x.toFixed(2)})`);
+  check(hostP.position.x > start, 'player moved forward from start');
 
   // Stop input: send zero direction, position should stop changing
   room1.send('PLAYER_MOVE', { direction: { x: 0, y: 0, z: 0 }, timestamp: Date.now() + 100000 });
-  await new Promise((r) => setTimeout(r, 100));
-  const stopped = host.position.x;
-  await new Promise((r) => setTimeout(r, 200));
-  st = room1.state;
-  host = [...st.players.values()].find((p: any) => p.isHost);
-  check(Math.abs(host.position.x - stopped) < 0.001, `player stops on zero input (dx=${(host.position.x - stopped).toFixed(4)})`);
+  await wait(100);
+  const stopped = hostP.position.x;
+  await wait(200);
+  hostP = await findHost(state);
+  check(Math.abs(hostP.position.x - stopped) < 0.001, `player stops on zero input (dx=${(hostP.position.x - stopped).toFixed(4)})`);
 
   // Reject invalid direction (magnitude > 1)
-  room1
-    .send('PLAYER_MOVE', { direction: { x: 99, y: 0, z: 0 }, timestamp: Date.now() + 200000 });
+  room1.send('PLAYER_MOVE', { direction: { x: 99, y: 0, z: 0 }, timestamp: Date.now() + 200000 });
   check(true, 'invalid move message sent (server must reject silently - no crash)');
 
-  console.log(failures.length === 0 ? '\nALL TESTS PASSED' : `\n${failures.length} TESTS FAILED`);
+  console.log(
+    failures.length === 0
+      ? '\nALL MOVEMENT TESTS PASSED'
+      : `\n${failures.length} MOVEMENT TESTS FAILED`,
+  );
   room1.leave();
-  room2.leave();
   await gameServer.gracefullyShutdown();
   process.exit(failures.length === 0 ? 0 : 1);
 }
 
 main().catch((err) => {
-  console.error('TEST FAILED (exception):', err);
+  console.error('MOVEMENT TEST FAILED (exception):', err);
   process.exit(1);
 });
