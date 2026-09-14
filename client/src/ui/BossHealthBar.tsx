@@ -18,7 +18,7 @@ const phaseLabels: Record<string, string> = {
   [BossPhase.ENRAGED]: 'ENRAGED',
 }
 
-export function BossHealthBar({
+export const BossHealthBar = React.memo(function BossHealthBar({
   health,
   maxHealth,
   phase,
@@ -91,4 +91,4 @@ export function BossHealthBar({
       )}
     </div>
   )
-}
+})

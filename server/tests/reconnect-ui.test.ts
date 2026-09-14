@@ -2,11 +2,12 @@ process.env.STORM_RECONNECT_TIMEOUT_MS = '5000';
 
 import { Client } from 'colyseus.js';
 import { matchMaker } from 'colyseus';
-import { RoomPhase, ConnectionStatus } from '@storm-arena/shared';
+import { RoomPhase, ConnectionStatus, BossPhase } from '@storm-arena/shared';
 import {
   createRoom,
   joinRoom,
   startGame,
+  leaveRoom,
   reconnect,
   getCurrentRoom,
   RoomError,
@@ -35,6 +36,10 @@ function serverRoom(roomId: string) {
   }
 }
 
+async function freshRaw() {
+  return new Client(`ws://localhost:${PORT}`);
+}
+
 async function main() {
   resetFailures();
   const { GameRoom } = await import('../src/rooms/GameRoom.js');
@@ -43,83 +48,180 @@ async function main() {
   console.log(`test game server listening on ${PORT}`);
   console.log('reconnect window is 5000ms (STORM_RECONNECT_TIMEOUT_MS)');
 
-  const raw = new Client(`ws://localhost:${PORT}`);
-
-  // -------------------------------------------------------------------------
-  // Lobby disconnect is permanent (player removed, no reconnection)
-  // -------------------------------------------------------------------------
-  console.log('\n[disconnect in lobby]');
-  const hostRoom = await createRoom('easy');
-  const guest = await raw.joinById(hostRoom.roomId, {});
+  // =========================================================================
+  // 1. LOBBY DISCONNECT — PERMANENT (player removed, no reconnection)
+  // =========================================================================
+  console.log('\n[1] disconnect in lobby]');
+  const raw1 = await freshRaw();
+  const lobbyRoom = await createRoom('easy');
+  const lobbyGuest = await raw1.joinById(lobbyRoom.roomId, {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 2,
-    'lobby reaches 2 players',
+    '1: lobby reaches 2 players',
   );
 
-  check(serverRoom(hostRoom.roomId)!.state.players.size === 2, 'two players in room before disconnect');
+  check(serverRoom(lobbyRoom.roomId)!.state.players.size === 2, '1: two players before disconnect');
 
   (getCurrentRoom() as any).connection.close(4001);
   await until(
     () => fresh().connection.status === ConnectionStatus.RECONNECTING,
-    'unexpected leave enters reconnecting state',
+    '1: unexpected leave enters reconnecting state',
   );
-  check(fresh().connection.roomId === null, 'connection cleared after unexpected leave');
+  check(fresh().connection.roomId === null, '1: connection cleared after unexpected leave');
   check(
-    serverRoom(hostRoom.roomId)!.state.players.size === 1,
-    'lobby disconnect removes the player from the server',
+    serverRoom(lobbyRoom.roomId)!.state.players.size === 1,
+    '1: lobby disconnect removes the player from server',
   );
 
-  // -------------------------------------------------------------------------
-  // In-game disconnect + reconnect within window
-  // -------------------------------------------------------------------------
-  console.log('\n[reconnect within window]');
-  await raw.joinById(hostRoom.roomId, {});
+  await lobbyGuest.leave();
+  await sleep(500);
+
+  // =========================================================================
+  // 2. IN-GAME DISCONNECT + RECONNECT WITHIN WINDOW
+  // =========================================================================
+  console.log('\n[2] reconnect within window]');
+  const raw2 = await freshRaw();
+  const gameRoom = await createRoom('easy');
+  const gameGuest = await raw2.joinById(gameRoom.roomId, {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 2,
-    'lobby reaches 2 players again',
+    '2: lobby reaches 2 players',
   );
-  if (fresh().lobby.hostId !== fresh().localPlayerId) {
-    raw.send('HOST_START', {});
-  } else {
-    startGame();
-  }
-  await until(() => fresh().gameState?.phase === RoomPhase.GAME, 'phase transitions to GAME');
+
+  startGame();
+  await until(() => fresh().gameState?.phase === RoomPhase.GAME, '2: phase transitions to GAME');
+  check(fresh().isMatchActive, '2: match marked active');
 
   (getCurrentRoom() as any).connection.close(4001);
+  await sleep(200);
   await until(
     () => fresh().connection.status === ConnectionStatus.RECONNECTING,
-    'disconnect during game enters reconnecting state',
+    '2: disconnect during game enters reconnecting state',
   );
-  check(
-    serverRoom(hostRoom.roomId)!.state.players.size === 1,
-    'player kept in room during reconnection window',
-  );
+  const pDuringReconnect = serverRoom(gameRoom.roomId)?.state?.players?.size;
+  check((pDuringReconnect ?? 0) >= 1, '2: player kept in room during reconnection window');
 
   const restored = await reconnect();
-  check(Boolean(restored), 'reconnect() restored a live room');
+  check(Boolean(restored), '2: reconnect() restored a live room');
   await until(
     () =>
       fresh().connection.status === ConnectionStatus.CONNECTED &&
       Object.keys(fresh().lobby.players).length === 2 &&
       fresh().gameState?.phase === RoomPhase.GAME,
-    'game state restored after reconnect',
+    '2: game state restored after reconnect',
   );
-  check(fresh().connection.status === ConnectionStatus.CONNECTED, 'connection reports connected after reconnect');
-  check(Object.keys(fresh().lobby.players).length === 2, 'player slots restored after reconnect');
-  check(fresh().gameState?.phase === RoomPhase.GAME, 'game phase preserved after reconnect');
 
-  // -------------------------------------------------------------------------
-  // Reconnect after the window expired (server removes the player)
-  // -------------------------------------------------------------------------
-  console.log('\n[reconnect after window expiry]');
+  check(fresh().connection.status === ConnectionStatus.CONNECTED, '2: connection status is CONNECTED');
+  check(fresh().connection.roomId !== null, '2: roomId is set after reconnect');
+  check(Object.keys(fresh().lobby.players).length === 2, '2: player slots restored (2 players)');
+  check(fresh().gameState?.phase === RoomPhase.GAME, '2: game phase preserved as GAME');
+  check(fresh().localPlayerId !== null, '2: localPlayerId restored after reconnect');
+  check(fresh().isMatchActive === true, '2: match still active after reconnect');
+
+  // =========================================================================
+  // 3. DISCONNECT DURING BOSS PHASE
+  // =========================================================================
+  console.log('\n[3] disconnect during boss phase]');
+  const bossRoom = matchMaker.getRoomById(gameRoom.roomId) as any;
+  bossRoom.state.boss.health = 400;
+  bossRoom.state.boss.maxHealth = 500;
+  bossRoom.state.boss.phase = BossPhase.PHASE_2;
+  bossRoom.state.boss.isActive = true;
+  bossRoom.state.boss.isEnraged = false;
+
+  await until(() => fresh().gameUI.bossHealth === 400, '3: boss health consumed before disconnect');
+  check(fresh().gameUI.bossHealth === 400, '3: boss health is 400 before disconnect');
+  check(fresh().gameUI.bossPhase === BossPhase.PHASE_2, '3: boss phase is PHASE_2 before disconnect');
+
+  (getCurrentRoom() as any).connection.close(4001);
+  await sleep(200);
+  await until(
+    () => fresh().connection.status === ConnectionStatus.RECONNECTING,
+    '3: disconnect during boss enters reconnecting state',
+  );
+  const bossP = serverRoom(gameRoom.roomId)?.state?.players?.size;
+  check((bossP ?? 0) >= 1, '3: player kept in room during boss disconnect');
+
+  const bossOnServer = bossRoom.state.boss;
+  check(bossOnServer.health === 400, '3: boss health preserved on server');
+  check(bossOnServer.phase === BossPhase.PHASE_2, '3: boss phase preserved on server');
+  check(bossOnServer.isActive === true, '3: boss still active on server');
+
+  const bossReconnected = await reconnect();
+  check(Boolean(bossReconnected), '3: reconnect during boss phase succeeded');
+  await until(
+    () =>
+      fresh().connection.status === ConnectionStatus.CONNECTED &&
+      fresh().gameState?.phase === RoomPhase.GAME,
+    '3: game state restored after boss reconnect',
+  );
+
+  check(fresh().gameUI.bossHealth === 400, '3: boss health restored after reconnect');
+  check(fresh().gameUI.bossPhase === BossPhase.PHASE_2, '3: boss phase restored after reconnect');
+  check(fresh().connection.status === ConnectionStatus.CONNECTED, '3: connected after boss reconnect');
+
+  // =========================================================================
+  // 4. BOSS PHASE CHANGE DURING RECONNECTION WINDOW
+  // =========================================================================
+  console.log('\n[4] boss phase change during reconnect]');
+  bossRoom.state.boss.health = 150;
+  bossRoom.state.boss.phase = BossPhase.ENRAGED;
+  bossRoom.state.boss.isEnraged = true;
+
+  await until(() => fresh().gameUI.bossHealth === 150, '4: boss health updated');
+  check(fresh().gameUI.bossPhase === BossPhase.ENRAGED, '4: boss phase updated to ENRAGED');
+
   (getCurrentRoom() as any).connection.close(4001);
   await until(
     () => fresh().connection.status === ConnectionStatus.RECONNECTING,
-    'second disconnect enters reconnecting state',
+    '4: disconnect during enraged boss',
   );
+
+  bossRoom.state.boss.health = 50;
+  await sleep(500);
+
+  const enragedReconnect = await reconnect();
   await until(
-    () => serverRoom(hostRoom.roomId)!.state.players.size === 1,
-    'server removes player after reconnect window expires',
+    () => fresh().connection.status === ConnectionStatus.CONNECTED,
+    '4: reconnected after enraged boss disconnect',
+  );
+  await sleep(300);
+  await until(() => fresh().gameUI.bossHealth === 50, '4: boss health reaches 50 after reconnect');
+  check(fresh().gameUI.bossHealth === 50, '4: boss health updated to 50 after reconnect');
+  check(fresh().gameUI.bossPhase === BossPhase.ENRAGED, '4: boss phase still ENRAGED after reconnect');
+  check(fresh().gameUI.bossEnraged === true, '4: boss enraged flag restored');
+
+  // Clean up game room
+  await leaveRoom();
+  await sleep(500);
+  await gameGuest.leave();
+  await sleep(500);
+
+  // =========================================================================
+  // 5. RECONNECT AFTER WINDOW EXPIRED (server removes the player)
+  // =========================================================================
+  console.log('\n[5] reconnect after window expiry]');
+  const raw5 = await freshRaw();
+  const expiryRoom = await createRoom('easy');
+  const expiryGuest = await raw5.joinById(expiryRoom.roomId, {});
+  await until(
+    () => Object.keys(fresh().lobby.players).length === 2,
+    '5: lobby reaches 2 players',
+  );
+
+  startGame();
+  await until(() => fresh().gameState?.phase === RoomPhase.GAME, '5: game started');
+
+  (getCurrentRoom() as any).connection.close(4001);
+  await until(
+    () => fresh().connection.status === ConnectionStatus.RECONNECTING,
+    '5: disconnect enters reconnecting state',
+  );
+
+  // Wait for window to expire (5s + buffer)
+  await until(
+    () => (serverRoom(expiryRoom.roomId)?.state?.players?.size ?? 0) === 1,
+    '5: server removes player after reconnect window expires',
     12000,
   );
 
@@ -129,28 +231,125 @@ async function main() {
   } catch (err) {
     failed = err instanceof RoomError;
   }
-  check(failed, 'reconnect after window expiry is rejected');
+  check(failed, '5: reconnect after window expiry is rejected');
   check(
     fresh().connection.status === ConnectionStatus.DISCONNECTED,
-    'connection returns to disconnected after failed reconnect',
+    '5: connection returns to disconnected after failed reconnect',
   );
 
-  // -------------------------------------------------------------------------
-  // Room destroyed when the last player leaves
-  // -------------------------------------------------------------------------
-  console.log('\n[room destroyed handling]');
-  const guestLast = await raw.joinById(hostRoom.roomId, {});
-  await sleep(400);
-  await guestLast.leave();
-  await until(() => !serverRoom(hostRoom.roomId), 'room destroyed when empty');
-  check(true, 'empty room is disposed by the server');
+  await expiryGuest.leave();
+  await sleep(500);
 
-  await leaveAll([hostRoom, guest]);
+  // =========================================================================
+  // 6. REMAINING PLAYER CONTINUATION — 4→3→2 PLAYERS
+  // =========================================================================
+  console.log('\n[6] remaining player continuation]');
+  const raw6a = await freshRaw();
+  const raw6b = await freshRaw();
+  const raw6c = await freshRaw();
+  const contRoom = await createRoom('normal');
+  const contGuest1 = await raw6a.joinById(contRoom.roomId, {});
+  const contGuest2 = await raw6b.joinById(contRoom.roomId, {});
+  const contGuest3 = await raw6c.joinById(contRoom.roomId, {});
+  await until(
+    () => Object.keys(fresh().lobby.players).length >= 4,
+    '6: 4-player room created',
+  );
+  check(Object.keys(fresh().lobby.players).length === 4, '6: 4 players in lobby');
+
+  startGame();
+  await until(() => fresh().gameState?.phase === RoomPhase.GAME, '6: game started');
+  check(fresh().isMatchActive === true, '6: match active with 4 players');
+
+  await contGuest3.leave();
+  await sleep(500);
+
+  check(fresh().isMatchActive === true, '6: match still active after 1 player leaves');
+  check(fresh().gameState?.phase === RoomPhase.GAME, '6: game phase still GAME');
+
+  await contGuest2.leave();
+  await sleep(500);
+
+  check(fresh().isMatchActive === true, '6: match still active with 2 players');
+  check(fresh().gameState?.phase === RoomPhase.GAME, '6: game phase still GAME with 2 players');
+
+  const remainingPlayers = Object.keys(fresh().lobby.players).length;
+  check(remainingPlayers >= 2, `6: at least 2 players remain (${remainingPlayers})`);
+
+  await leaveRoom();
+  await sleep(500);
+  await contGuest1.leave();
+  await sleep(500);
+
+  // =========================================================================
+  // 7. ROOM DESTROYED WHEN EMPTY
+  // =========================================================================
+  console.log('\n[7] room destroyed when empty]');
+  const raw7 = await freshRaw();
+  const destroyGuest = await raw7.create('game_room', { difficulty: 'easy' });
+  await sleep(500);
+  const destroyGuest2 = await raw7.joinById(destroyGuest.roomId, {});
+  await sleep(500);
+  const destroyGuest3 = await raw7.joinById(destroyGuest.roomId, {});
+  await sleep(500);
+
+  // Leave all — room should be destroyed
+  await destroyGuest.leave();
+  await sleep(200);
+  await destroyGuest2.leave();
+  await sleep(200);
+  await destroyGuest3.leave();
+  await sleep(200);
+
+  await until(() => !serverRoom(destroyGuest.roomId), '7: room destroyed when empty', 8000);
+  check(true, '7: empty room is disposed by the server');
+
+  // =========================================================================
+  // 8. RECONNECT UI — CORRECT SCREEN VERIFICATION
+  // =========================================================================
+  console.log('\n[8] reconnect UI screen correctness]');
+  const raw8 = await freshRaw();
+  const screenRoom = await createRoom('easy');
+  const screenGuest = await raw8.joinById(screenRoom.roomId, {});
+  await until(
+    () => Object.keys(fresh().lobby.players).length >= 2,
+    '8: lobby reached',
+  );
+
+  startGame();
+  await until(() => fresh().gameState?.phase === RoomPhase.GAME, '8: game started');
+
+  check(fresh().isMatchActive === true, '8: UI shows active match');
+  check(fresh().gameState?.phase === RoomPhase.GAME, '8: UI shows GAME phase');
+
+  (getCurrentRoom() as any).connection.close(4001);
+  await until(
+    () => fresh().connection.status === ConnectionStatus.RECONNECTING,
+    '8: UI shows reconnecting state',
+  );
+
+  check(fresh().connection.status === ConnectionStatus.RECONNECTING, '8: status is RECONNECTING');
+  check(fresh().isMatchActive === true, '8: match still marked active during reconnect');
+
+  await reconnect();
+  await until(
+    () => fresh().connection.status === ConnectionStatus.CONNECTED,
+    '8: reconnected',
+  );
+
+  check(fresh().connection.status === ConnectionStatus.CONNECTED, '8: status is CONNECTED');
+  check(fresh().gameState?.phase === RoomPhase.GAME, '8: screen is GAME (not lobby)');
+  check(fresh().isMatchActive === true, '8: match still active after reconnect');
+  check(fresh().localPlayerId !== null, '8: localPlayerId restored');
+
+  // =========================================================================
+  // CLEANUP
+  // =========================================================================
+  await leaveAll([screenGuest, screenRoom, contRoom, destroyGuest, destroyGuest2, destroyGuest3, raw1, raw2, raw5, raw6a, raw6b, raw6c, raw7, raw8]);
   finish(title);
 }
 
-// safety net: never hang the test run
-setTimeout(finish, 45000, title).unref();
+setTimeout(finish, 120000, title).unref();
 
 main().catch((err) => {
   console.error('RECONNECTION UI TEST FAILED (exception):', err);

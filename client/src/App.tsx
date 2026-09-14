@@ -39,6 +39,13 @@ export default function App() {
     const unsubscribeSettings = useGameStore.subscribe((state, prevState) => {
       if (state.settings !== prevState.settings) {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings))
+        
+        // Phase 21: Notify Member 2's AudioManager & Rendering of settings change
+        window.dispatchEvent(
+          new CustomEvent('storm-arena-settings-changed', {
+            detail: state.settings,
+          })
+        )
       }
       if (state.auth !== prevState.auth) {
         if (state.auth.isAuthenticated && state.auth.token) {
@@ -52,5 +59,9 @@ export default function App() {
     return unsubscribeSettings
   }, [])
 
-  return <Router />
+  return (
+    <div className="w-full h-full w-screen h-screen overflow-hidden select-none bg-storm-950 flex flex-col">
+      <Router />
+    </div>
+  )
 }

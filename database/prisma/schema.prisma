@@ -32,6 +32,9 @@ model Profile {
   totalDamage Int      @default(0)
   avatar      String?
   updatedAt   DateTime @updatedAt
+
+  @@index([xp(sort: Desc)])
+  @@index([wins(sort: Desc)])
 }
 
 model Match {

@@ -47,7 +47,10 @@ async function leaveAll(rooms: any[]) {
   for (const r of rooms) {
     if (r && typeof r.leave === 'function') {
       try {
-        await r.leave();
+        await Promise.race([
+          r.leave().catch(() => {}),
+          new Promise((resolve) => setTimeout(resolve, 200)),
+        ]);
       } catch {
         // ignore
       }

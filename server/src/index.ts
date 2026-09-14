@@ -102,12 +102,20 @@ async function main() {
 
   const httpServer = http.createServer(app);
 
-  const achievements = new AchievementService();
-  await achievements.ensureDefinitions();
-  logger.info('startup', 'Achievements ensured.');
-
   const dbBoot = await databaseStatus();
   logger[dbBoot.ok ? 'info' : 'error']('startup', dbBoot.ok ? 'Database connection established.' : 'Database connection FAILED.', dbBoot);
+
+  if (dbBoot.ok) {
+    try {
+      const achievements = new AchievementService();
+      await achievements.ensureDefinitions();
+      logger.info('startup', 'Achievements ensured.');
+    } catch (err) {
+      logger.warn('startup', 'Failed to ensure achievement definitions', { message: String(err) });
+    }
+  } else {
+    logger.warn('startup', 'Database offline; achievement initialization deferred.');
+  }
 
   const gameServer = new Server({ server: httpServer });
 

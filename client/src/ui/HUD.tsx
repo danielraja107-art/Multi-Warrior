@@ -56,7 +56,7 @@ const DEMO_PLAYERS: HUDPlayer[] = [
   { id: '', name: '', color: PlayerColor.YELLOW, health: 0, maxHealth: 100, weapon: WeaponType.FIST, isAlive: false, isLocal: false, isDead: false },
 ]
 
-export function HUD() {
+export const HUD = React.memo(function HUD() {
   const navigate = useNavigate()
   const gameState = useGameStore((s) => s.gameState)
   const localPlayerId = useGameStore((s) => s.localPlayerId)
@@ -168,4 +168,4 @@ export function HUD() {
       </div>
     </div>
   )
-}
+})

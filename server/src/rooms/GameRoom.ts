@@ -139,7 +139,7 @@ export class GameRoom extends Room<GameState> {
         }
       }
     } else {
-      this.allowReconnection(client, RECONNECT_TIMEOUT_MS)
+      this.allowReconnection(client, RECONNECT_TIMEOUT_MS / 1000)
         .then(() => {
           const player = this.state.players.get(client.sessionId);
           if (player) {

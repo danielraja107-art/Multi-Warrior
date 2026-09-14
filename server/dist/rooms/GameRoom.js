@@ -13,7 +13,7 @@ const PLAYER_COLORS = [
 ];
 const MAX_PLAYERS = 4;
 const TICK_INTERVAL_MS = 50;
-const RECONNECT_TIMEOUT_MS = 30000;
+const RECONNECT_TIMEOUT_MS = Number(process.env.STORM_RECONNECT_TIMEOUT_MS || '30000');
 function generateRoomCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
@@ -113,7 +113,7 @@ class GameRoom extends colyseus_1.Room {
             }
         }
         else {
-            this.allowReconnection(client, RECONNECT_TIMEOUT_MS)
+            this.allowReconnection(client, RECONNECT_TIMEOUT_MS / 1000)
                 .then(() => {
                 const player = this.state.players.get(client.sessionId);
                 if (player) {

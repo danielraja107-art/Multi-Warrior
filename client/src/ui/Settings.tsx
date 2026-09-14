@@ -14,7 +14,7 @@ export function Settings() {
 
   const handleSave = () => {
     setSettings({ musicVolume, sfxVolume, masterVolume, graphicsQuality })
-    navigate('/')
+    navigate(-1)
   }
 
   const handleReset = () => {
@@ -81,7 +81,7 @@ export function Settings() {
 
       <div className="relative z-10 w-full max-w-md mx-4 animate-slide-up">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate(-1)}
           className="absolute -top-12 left-0 font-body text-sm text-storm-400 hover:text-white transition-colors flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
