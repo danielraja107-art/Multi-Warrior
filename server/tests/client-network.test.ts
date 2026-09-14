@@ -88,6 +88,7 @@ async function main() {
   check(Object.keys(fresh().lobby.players).length === 1, 'local player present in lobby');
 
   const rawFriend = await raw.joinById(hostRoom.roomId, {});
+  rawFriend.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 2,
     'lobby sees 2 players',
@@ -144,7 +145,9 @@ async function main() {
   check(fresh().lobby.hostId !== fresh().localPlayerId, 'guest is not the host');
 
   const filler3 = await raw.joinById(guestRoom.roomId, {});
+  filler3.onMessage('GAME_EVENT', () => {});
   const filler4 = await raw.joinById(guestRoom.roomId, {});
+  filler4.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 4,
     'room reaches 4 players',

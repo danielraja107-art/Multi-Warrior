@@ -25,6 +25,7 @@ export class WaveDirector {
   private isResting = false;
   private restTimer: NodeJS.Timeout | null = null;
   private waveConfigs: Map<number, WaveConfig> = new Map();
+  private activeSpawnTimers: NodeJS.Timeout[] = [];
 
   constructor(room: Room<GameState>, enemySystem: EnemySystem, weaponSystem: WeaponSystem, bossSystem?: BossSystem) {
     this.room = room;
@@ -118,12 +119,15 @@ export class WaveDirector {
     }
 
     spawnTimes.forEach((delay, index) => {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        this.activeSpawnTimers = this.activeSpawnTimers.filter((t) => t !== timer);
         if (this.currentWave !== config.wave) return;
+        if ((this.room as any).simulationPaused) return;
         const type = config.enemyTypes[index % config.enemyTypes.length];
         this.enemySystem.spawnEnemy(type);
         this.room.state.enemiesRemaining++;
       }, delay);
+      this.activeSpawnTimers.push(timer);
     });
 
     const totalSpawnTime = spawnTimes[spawnTimes.length - 1] + config.spawnIntervalMs;
@@ -254,6 +258,19 @@ export class WaveDirector {
       clearTimeout(this.restTimer);
       this.isResting = false;
       this.startNextWaveInternal();
+    }
+  }
+
+  resetWave(): void {
+    for (const timer of this.activeSpawnTimers) {
+      clearTimeout(timer);
+    }
+    this.activeSpawnTimers = [];
+    this.currentWave = 0;
+    this.isResting = false;
+    if (this.restTimer) {
+      clearTimeout(this.restTimer);
+      this.restTimer = null;
     }
   }
 }

@@ -86,6 +86,7 @@ async function main() {
   console.log('\n[1] disconnect in lobby]');
   const lobbyRoom = await createRoom('easy');
   const lobbyGuest = await raw.joinById(lobbyRoom.roomId, {});
+  lobbyGuest.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 2,
     '1: lobby reaches 2 players',
@@ -119,6 +120,7 @@ async function main() {
   console.log('\n[2] reconnect within window]');
   const gameRoom = await createRoom('normal');
   const gameGuest = await raw.joinById(gameRoom.roomId, {});
+  gameGuest.onMessage('GAME_EVENT', () => {});
   await until(
     () => serverRoom(gameRoom.roomId)!.state.players.size === 2,
     '2: game room reaches 2 players',
@@ -299,6 +301,7 @@ async function main() {
   const raw5 = await freshRaw();
   const expiryRoom = await createRoom('easy');
   const expiryGuest = await raw5.joinById(expiryRoom.roomId, {});
+  expiryGuest.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 2,
     '5: lobby reaches 2 players',
@@ -344,8 +347,11 @@ async function main() {
   const raw6c = await freshRaw();
   const contRoom = await createRoom('normal');
   const contGuest1 = await raw6a.joinById(contRoom.roomId, {});
+  contGuest1.onMessage('GAME_EVENT', () => {});
   const contGuest2 = await raw6b.joinById(contRoom.roomId, {});
+  contGuest2.onMessage('GAME_EVENT', () => {});
   const contGuest3 = await raw6c.joinById(contRoom.roomId, {});
+  contGuest3.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length >= 4,
     '6: 4-player room created',
@@ -382,10 +388,13 @@ async function main() {
   console.log('\n[7] room destroyed when empty]');
   const raw7 = await freshRaw();
   const destroyGuest = await raw7.create('game_room', { difficulty: 'easy' });
+  destroyGuest.onMessage('GAME_EVENT', () => {});
   await sleep(500);
   const destroyGuest2 = await raw7.joinById(destroyGuest.roomId, {});
+  destroyGuest2.onMessage('GAME_EVENT', () => {});
   await sleep(500);
   const destroyGuest3 = await raw7.joinById(destroyGuest.roomId, {});
+  destroyGuest3.onMessage('GAME_EVENT', () => {});
   await sleep(500);
 
   // Leave all — room should be destroyed
@@ -406,6 +415,7 @@ async function main() {
   const raw8 = await freshRaw();
   const screenRoom = await createRoom('easy');
   const screenGuest = await raw8.joinById(screenRoom.roomId, {});
+  screenGuest.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length >= 2,
     '8: lobby reached',

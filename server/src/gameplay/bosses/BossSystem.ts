@@ -50,8 +50,6 @@ export class BossSystem {
       this.triggerAttack();
       this.lastAttackAt = elapsed;
     }
-
-    this.syncPhaseFromHealth();
   }
 
   applyDamage(amount: number): boolean {

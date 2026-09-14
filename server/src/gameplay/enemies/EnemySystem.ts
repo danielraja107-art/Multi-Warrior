@@ -312,7 +312,7 @@ export class EnemySystem {
   }
 
   clearAll(): void {
-    this.enemies.forEach((_, id) => this.room.state.enemies.delete(id));
+    this.room.state.enemies.clear();
     this.enemies.clear();
     this.room.state.enemiesRemaining = 0;
   }

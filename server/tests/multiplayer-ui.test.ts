@@ -85,8 +85,11 @@ async function main() {
   console.log('\n[4-player lobby — full room]');
   const hostRoom = await createRoom('easy');
   const filler1 = await raw.joinById(hostRoom.roomId, {});
+  filler1.onMessage('GAME_EVENT', () => {});
   const filler2 = await raw.joinById(hostRoom.roomId, {});
+  filler2.onMessage('GAME_EVENT', () => {});
   const filler3 = await raw.joinById(hostRoom.roomId, {});
+  filler3.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 4,
     '4-player lobby reaches 4 players',
@@ -138,6 +141,8 @@ async function main() {
   await until(() => fresh().gameState?.phase === RoomPhase.GAME, 'phase transitions to GAME');
   check(fresh().isMatchActive, 'start: match marked active while in GAME phase');
   check(fresh().gameState?.phase === RoomPhase.GAME, 'start: gameState.phase is GAME');
+
+  room.resetForTest();
 
   // =========================================================================
   // WAVE NUMBER — SERVER → UI
@@ -276,6 +281,8 @@ async function main() {
   room.state.boss.phase = BossPhase.PHASE_2;
   room.state.boss.isEnraged = true;
   room.state.boss.isActive = true;
+  room.state.enemiesRemaining = 9;
+  localP!.health = 30;
 
   await until(
     () =>
@@ -496,7 +503,9 @@ async function main() {
   const room3 = await createRoom('hard');
   const raw2 = new Client(`ws://localhost:${PORT}`);
   const guest2 = await raw2.joinById(room3.roomId, {});
+  guest2.onMessage('GAME_EVENT', () => {});
   const guest3 = await raw2.joinById(room3.roomId, {});
+  guest3.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 3,
     '3p: lobby reaches 3 players',
@@ -530,6 +539,7 @@ async function main() {
   const room2 = await createRoom('easy');
   const raw3 = new Client(`ws://localhost:${PORT}`);
   const guest4 = await raw3.joinById(room2.roomId, {});
+  guest4.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 2,
     '2p: lobby reaches 2 players',

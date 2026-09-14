@@ -59,6 +59,7 @@ export class GameRoom extends Room<GameState> {
   private bossCombat = new CombatSystem();
   private bossSpawned = false;
   private bossDefeated = false;
+  public simulationPaused = false;
 
   onCreate(options: { difficulty?: string }) {
     this.setState(new GameState());
@@ -190,7 +191,9 @@ export class GameRoom extends Room<GameState> {
           restored.sessionId = client.sessionId;
         }
       }).catch(() => {
-        this.state.players.delete(client.sessionId);
+        if (this.state.players.has(client.sessionId)) {
+          this.state.players.delete(client.sessionId);
+        }
         if (this.state.players.size === 0) {
           this.disconnect();
         }
@@ -208,6 +211,31 @@ export class GameRoom extends Room<GameState> {
     this.projectiles.clearAll();
     this.bossAI = null;
     this.bossCombat.reset();
+  }
+
+  pause() {
+    this.simulationPaused = true;
+  }
+
+  unpause() {
+    this.simulationPaused = false;
+  }
+
+  resetForTest() {
+    this.simulationPaused = true;
+    this.enemySystem.clearAll();
+    this.bossSystem.update(0);
+    this.state.boss.health = 0;
+    this.state.boss.maxHealth = 0;
+    this.state.boss.isActive = false;
+    this.state.boss.isEnraged = false;
+    this.state.boss.phase = BossPhase.PHASE_1;
+    this.bossSpawned = false;
+    this.bossDefeated = false;
+    this.bossAI = null;
+    this.bossCombat.reset();
+    this.waveDirector.resetWave();
+    this.simulationPaused = false;
   }
 
   private normalizeMoveInput(input: MovementInput): MovementInput | null {
@@ -268,7 +296,10 @@ export class GameRoom extends Room<GameState> {
       return;
     }
 
-    this.broadcast('WAVE_START', { wave: waveNumber });
+    this.broadcast('GAME_EVENT', {
+      event: GameEvent.WAVE_START,
+      data: { wave: waveNumber },
+    });
   }
 
   private spawnBoss(): void {
@@ -278,20 +309,13 @@ export class GameRoom extends Room<GameState> {
     this.bossAI = new BossAI(this.state.boss, this.state.difficulty);
     this.bossAI.spawn(this.state.players.size);
 
-    this.state.boss = Object.assign(this.state.boss, {
-      id: this.state.boss.id,
-      health: this.state.boss.health,
-      maxHealth: this.state.boss.maxHealth,
-      phase: this.state.boss.phase,
-      isActive: this.state.boss.isActive,
-      position: this.state.boss.position,
-      rotation: this.state.boss.rotation,
-    });
-
-    this.broadcast('BOSS_SPAWN', {
-      bossId: this.state.boss.id,
-      health: this.state.boss.health,
-      maxHealth: this.state.boss.maxHealth,
+    this.broadcast('GAME_EVENT', {
+      event: GameEvent.BOSS_SPAWN,
+      data: {
+        bossId: this.state.boss.id,
+        health: this.state.boss.health,
+        maxHealth: this.state.boss.maxHealth,
+      },
     });
   }
 
@@ -303,21 +327,29 @@ export class GameRoom extends Room<GameState> {
 
     const damageLog = this.bossCombat.resetDamageLog();
 
-    this.broadcast('BOSS_DEFEATED', {
-      bossId: this.state.boss.id,
-      damageLog: Object.fromEntries(damageLog),
+    this.broadcast('GAME_EVENT', {
+      event: GameEvent.BOSS_DEFEATED,
+      data: {
+        bossId: this.state.boss.id,
+        damageLog: Object.fromEntries(damageLog),
+      },
     });
 
     setTimeout(() => {
       this.state.phase = RoomPhase.VICTORY;
-      this.broadcast('VICTORY', {
-        wave: this.state.currentWave,
-        elapsedTime: this.state.elapsedTime,
+      this.broadcast('GAME_EVENT', {
+        event: GameEvent.MATCH_END,
+        data: {
+          victory: true,
+          wave: this.state.currentWave,
+          elapsedTime: this.state.elapsedTime,
+        },
       });
     }, 3000);
   }
 
   private serverTick(deltaTime: number) {
+    if (this.simulationPaused) return;
     if (this.state.phase !== RoomPhase.GAME) return;
 
     this.state.elapsedTime += deltaTime;
@@ -374,18 +406,21 @@ export class GameRoom extends Room<GameState> {
           player.state = PlayerState.DEAD;
           player.health = 0;
 
-          this.broadcast('PLAYER_DIED', {
-            playerId: result.targetId,
-            killedBy: 'boss',
+          this.broadcast('GAME_EVENT', {
+            event: GameEvent.PLAYER_DIED,
+            data: { sessionId: result.targetId, killedBy: 'boss' },
           });
         }
 
-        this.broadcast('PLAYER_DAMAGED', {
-          targetId: result.targetId,
-          damage: result.damage,
-          isDead: result.isDead,
-          knockbackX: result.knockbackX,
-          knockbackZ: result.knockbackZ,
+        this.broadcast('GAME_EVENT', {
+          event: 'player_damaged',
+          data: {
+            targetId: result.targetId,
+            damage: result.damage,
+            isDead: result.isDead,
+            knockbackX: result.knockbackX,
+            knockbackZ: result.knockbackZ,
+          },
         });
       }
     }

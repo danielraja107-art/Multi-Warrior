@@ -170,7 +170,7 @@ export class WeaponSystem {
   }
 
   clearAll(): void {
-    this.weapons.forEach((_, id) => this.room.state.weaponPickups.delete(id));
+    this.room.state.weaponPickups.clear();
     this.weapons.clear();
     this.respawnTimers.forEach(t => clearTimeout(t));
     this.respawnTimers.clear();

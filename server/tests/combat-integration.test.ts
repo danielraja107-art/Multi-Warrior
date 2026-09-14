@@ -39,6 +39,7 @@ async function main() {
   const hostRoom = await createRoom('easy');
   await until(() => fresh().gameState?.phase === RoomPhase.LOBBY, 'room in lobby');
   const firstGuest = await raw.joinById(hostRoom.roomId, {});
+  firstGuest.onMessage('GAME_EVENT', () => {});
   await until(() => Object.keys(fresh().lobby.players).length === 2, 'guest joined');
   startGame();
   await until(() => fresh().gameState?.phase === RoomPhase.GAME, 'phase transitions to GAME');
@@ -132,6 +133,7 @@ async function main() {
 
   console.log('\n[two players attack one enemy simultaneously]');
   const guestRoom = await raw.joinById(hostRoom.roomId, {});
+  guestRoom.onMessage('GAME_EVENT', () => {});
   await until(
     () => Object.keys(fresh().lobby.players).length === 3,
     'second guest joined',

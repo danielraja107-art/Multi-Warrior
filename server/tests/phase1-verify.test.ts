@@ -29,8 +29,10 @@ async function main() {
 
   const c1 = new Client(`ws://localhost:${PORT}`);
   const room1 = await c1.joinOrCreate('game_room');
+  room1.onMessage('GAME_EVENT', () => {});
   const c2 = new Client(`ws://localhost:${PORT}`);
   const room2 = await c2.joinOrCreate('game_room');
+  room2.onMessage('GAME_EVENT', () => {});
 
   await new Promise((r) => setTimeout(r, 200));
   room1.send('HOST_START', {});
