@@ -329,59 +329,59 @@ Implement server-authoritative enemies that detect, chase, attack, stagger, knoc
 
 ### Base enemy architecture
 
-- [ ] Create `EnemySystem.ts`.
-- [ ] Create reusable enemy base logic.
-- [ ] Add enemy IDs.
-- [ ] Add enemy health/max health.
-- [ ] Add enemy state.
-- [ ] Add enemy position/rotation.
-- [ ] Add target player selection.
+- [x] Create `EnemySystem.ts`.
+- [x] Create reusable enemy base logic.
+- [x] Add enemy IDs.
+- [x] Add enemy health/max health.
+- [x] Add enemy state.
+- [x] Add enemy position/rotation.
+- [x] Add target player selection.
 
 ### AI state machine
 
-- [ ] Implement IDLE.
-- [ ] Implement DETECT.
-- [ ] Implement CHASE.
-- [ ] Implement ATTACK.
-- [ ] Implement RECOVER.
-- [ ] Implement STAGGER.
-- [ ] Implement KNOCKBACK.
-- [ ] Implement DEAD.
-- [ ] Implement transitions between states.
-- [ ] Prevent invalid state transitions.
+- [x] Implement IDLE.
+- [x] Implement DETECT.
+- [x] Implement CHASE.
+- [x] Implement ATTACK.
+- [x] Implement RECOVER.
+- [x] Implement STAGGER.
+- [x] Implement KNOCKBACK.
+- [x] Implement DEAD.
+- [x] Implement transitions between states.
+- [x] Prevent invalid state transitions.
 
 ### Enemy types
 
-- [ ] Implement BasicEnemy.
-- [ ] Implement FastEnemy.
-- [ ] Implement HeavyEnemy.
-- [ ] Implement ShieldEnemy when required by the current phase.
-- [ ] Implement RangedEnemy when required by the current phase.
-- [ ] Implement EliteEnemy.
+- [x] Implement BasicEnemy.
+- [x] Implement FastEnemy.
+- [x] Implement HeavyEnemy.
+- [x] Implement ShieldEnemy when required by the current phase.
+- [x] Implement RangedEnemy when required by the current phase.
+- [x] Implement EliteEnemy.
 
 ### Scaling
 
-- [ ] Apply enemy health scaling per wave.
-- [ ] Apply enemy damage scaling per wave.
-- [ ] Use shared enemy constants.
-- [ ] Prevent client-controlled enemy stats.
+- [x] Apply enemy health scaling per wave.
+- [x] Apply enemy damage scaling per wave.
+- [x] Use shared enemy constants.
+- [x] Prevent client-controlled enemy stats.
 
 ### AI testing
 
-- [ ] Test target acquisition.
-- [ ] Test chase behavior.
-- [ ] Test attack range.
-- [ ] Test stagger interruption.
-- [ ] Test knockback.
-- [ ] Test death/removal.
-- [ ] Test multiple enemies attacking the same player.
+- [x] Test target acquisition.
+- [x] Test chase behavior.
+- [x] Test attack range.
+- [x] Test stagger interruption.
+- [x] Test knockback.
+- [x] Test death/removal.
+- [x] Test multiple enemies attacking the same player.
 
 ### Integration gate
 
-- [ ] Member 2 can render all authoritative enemy states.
-- [ ] Enemy animation state follows server state.
-- [ ] Member 3 can show enemy count and wave data later.
-- [ ] Verify no client can create/modify enemy health or position.
+- [x] Member 2 can render all authoritative enemy states.
+- [x] Enemy animation state follows server state.
+- [x] Member 3 can show enemy count and wave data later.
+- [x] Verify no client can create/modify enemy health or position.
 
 ---
 
