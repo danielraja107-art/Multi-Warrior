@@ -56,16 +56,18 @@ console.log('\n--- Integration: boundary + move/stop ---');
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function setupGame(): Promise<{ room1: any; state: any }> {
+async function setupGame(): Promise<{ room1: any; room2: any; state: any }> {
   const client1 = new Client(`ws://localhost:${PORT}`);
   const room1 = await client1.joinOrCreate('game_room');
+  room1.onMessage('GAME_EVENT', () => {});
   const client2 = new Client(`ws://localhost:${PORT}`);
-  await client2.joinOrCreate('game_room');
+  const room2 = await client2.joinOrCreate('game_room');
+  room2.onMessage('GAME_EVENT', () => {});
   await wait(200);
 
   room1.send('HOST_START', {});
   await wait(200);
-  return { room1, state: room1.state };
+  return { room1, room2, state: room1.state };
 }
 
 async function findHost(state: any): Promise<any> {
@@ -79,7 +81,7 @@ async function main() {
 
   console.log('test server listening on', PORT);
 
-  const { room1, state } = await setupGame();
+  const { room1, room2, state } = await setupGame();
   const host = await findHost(state);
   const startX = host.position.x;
   check(startX === -5, `host spawns at x=-5 (x=${startX})`);
@@ -149,6 +151,29 @@ async function main() {
   // Reject invalid direction (magnitude > 1)
   room1.send('PLAYER_MOVE', { direction: { x: 99, y: 0, z: 0 }, timestamp: Date.now() + 200000 });
   check(true, 'invalid move message sent (server must reject silently - no crash)');
+
+  console.log('\n--- Independent multi-player movement ---');
+  const getP2 = (s: any) => [...s.players.values()].find((p: any) => !p.isHost);
+  let p2 = getP2(state);
+  const p2Start = { x: p2.position.x, y: p2.position.y, z: p2.position.z };
+
+  room1.send('PLAYER_MOVE', { direction: { x: 0, y: 0, z: 0 }, timestamp: Date.now() });
+  await wait(100);
+  const p1Before = (await findHost(state)).position.x;
+
+  room2.send('PLAYER_MOVE', { direction: { x: 0, y: 0, z: 1 }, timestamp: Date.now() });
+  await wait(800);
+  p2 = getP2(room2.state);
+  const p1After = (await findHost(state)).position.x;
+  check(p2.position.z > p2Start.z, `player2 moved independently on +z (z=${p2.position.z.toFixed(2)})`);
+  check(Math.abs(p1After - p1Before) < 0.01, `player1 unaffected while player2 moves (x=${p1After.toFixed(2)})`);
+
+  console.log('\n--- 20Hz tick sanity ---');
+  room1.send('PLAYER_MOVE', { direction: { x: 0, y: 0, z: 0 }, timestamp: Date.now() });
+  const t0 = state.elapsedTime;
+  await wait(1000);
+  const elapsedDelta = state.elapsedTime - t0;
+  check(elapsedDelta > 700 && elapsedDelta < 1300, `elapsedTime advanced ~1s (${elapsedDelta.toFixed(0)}ms)`);
 
   console.log(
     failures.length === 0
