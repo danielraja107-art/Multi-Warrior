@@ -2,7 +2,8 @@ import { PositionHistory } from '../src/lag/PositionHistory';
 import { HitboxSystem } from '../src/gameplay/combat/HitboxSystem';
 import { DamageSystem } from '../src/gameplay/combat/DamageSystem';
 import { KnockbackSystem } from '../src/gameplay/combat/KnockbackSystem';
-import { EnemyState, WeaponType, AttackType } from '@storm-arena/shared';
+import { GameRoom } from '../src/rooms/GameRoom';
+import { Difficulty, WeaponType, AttackType, EnemyState, RoomPhase } from '@storm-arena/shared';
 
 let failures: string[] = [];
 
@@ -142,6 +143,50 @@ async function main() {
   );
   check(chain.length === 1, 'chain knockback affects enemy within 2.5 units');
   check(chain[0].id === 'e1', 'correct enemy affected by chain');
+
+  console.log('\n[Input validation]');
+  const gameRoom = new GameRoom() as any;
+  gameRoom.listing = { metadata: {}, remove: () => undefined };
+  gameRoom.broadcast = () => undefined;
+  gameRoom.onCreate({ difficulty: Difficulty.NORMAL });
+  gameRoom.onJoin({ sessionId: 'p1' });
+
+  const validMove = gameRoom.normalizeMoveInput({
+    direction: { x: 0.5, y: 0, z: 0.5 },
+    rotation: { x: 0, y: 0.5, z: 0 },
+    timestamp: 1000,
+  });
+  check(validMove !== null && validMove.direction.x === 0.5, 'valid movement payload accepted');
+
+  const invalidMove = gameRoom.normalizeMoveInput({
+    direction: { x: 99, y: 0, z: 0 },
+    timestamp: 1001,
+  });
+  check(invalidMove === null, 'impossible movement magnitude rejected');
+
+  const nanMove = gameRoom.normalizeMoveInput({
+    direction: { x: NaN, y: 0, z: 0 },
+    timestamp: 1002,
+  });
+  check(nanMove === null, 'NaN direction rejected');
+
+  const invalidAttack = gameRoom.validateAttackPayload({
+    type: 'light',
+    weapon: 'hammer',
+    timestamp: Date.now(),
+  }, 'p1');
+  check(invalidAttack === false, 'invalid weapon claim rejected');
+
+  const validAttack = gameRoom.validateAttackPayload({
+    type: 'light',
+    weapon: 'fist',
+    timestamp: Date.now(),
+  }, 'p1');
+  check(validAttack === true, 'valid attack payload accepted');
+
+  check(gameRoom.detectSpeedHack('p1', { x: 50, y: 0, z: 0 }, 50) === true, 'speed hack detected');
+
+  check(gameRoom.state.phase === RoomPhase.LOBBY, 'room starts in lobby');
 
   finish('COMBAT UNIT');
 }
