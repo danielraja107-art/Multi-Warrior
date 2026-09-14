@@ -58,10 +58,17 @@ export function GameScreen() {
   }
 
   return (
-    <div className="relative w-full h-full bg-storm-950">
-      <div className="absolute inset-0 bg-storm-gradient" />
+    <div className="relative w-full h-full w-screen h-screen overflow-hidden bg-storm-950 select-none">
+      {/* Phase 21: Member 2's 3D canvas mounts here via id selector */}
+      <div id="game-canvas-container" className="absolute inset-0 w-full h-full z-0 overflow-hidden" />
 
-      <HUD />
+      {/* UI overlay — pointer-events-none so clicks reach the 3D canvas;
+          interactive elements inside re-enable pointer-events as needed */}
+      <div className="absolute inset-0 w-full h-full z-10 pointer-events-none">
+        <div className="pointer-events-auto w-full h-full">
+          <HUD />
+        </div>
+      </div>
 
       {showBossHealth && (
         <BossHealthBar

@@ -14,6 +14,8 @@ interface MenuItem {
 export function MainMenu() {
   const navigate = useNavigate();
   const isAuthenticated = useGameStore((s) => s.auth.isAuthenticated);
+  const username = useGameStore((s) => s.auth.username);
+  const logout = useGameStore((s) => s.logout);
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [showFriends, setShowFriends] = useState(false);
   const [friendsMenuIndex, setFriendsMenuIndex] = useState(0);
@@ -188,19 +190,36 @@ export function MainMenu() {
         </div>
 
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4">
-          <button
-            onClick={() => navigate('/login')}
-            className="font-body text-xs text-storm-400 hover:text-accent-lightning transition-colors duration-300 tracking-wider uppercase"
-          >
-            Sign In
-          </button>
-          <div className="w-px h-3 bg-storm-600" />
-          <button
-            onClick={() => navigate('/register')}
-            className="font-body text-xs text-storm-400 hover:text-accent-lightning transition-colors duration-300 tracking-wider uppercase"
-          >
-            Create Account
-          </button>
+          {isAuthenticated ? (
+            <div className="flex items-center gap-3">
+              <span className="font-body text-xs text-storm-300">
+                Signed in as <span className="text-accent-lightning font-semibold">{username || 'Player'}</span>
+              </span>
+              <div className="w-px h-3 bg-storm-600" />
+              <button
+                onClick={logout}
+                className="font-body text-xs text-storm-400 hover:text-player-red transition-colors duration-300 tracking-wider uppercase"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => navigate('/login')}
+                className="font-body text-xs text-storm-400 hover:text-accent-lightning transition-colors duration-300 tracking-wider uppercase"
+              >
+                Sign In
+              </button>
+              <div className="w-px h-3 bg-storm-600" />
+              <button
+                onClick={() => navigate('/register')}
+                className="font-body text-xs text-storm-400 hover:text-accent-lightning transition-colors duration-300 tracking-wider uppercase"
+              >
+                Create Account
+              </button>
+            </>
+          )}
         </div>
       </div>
 
