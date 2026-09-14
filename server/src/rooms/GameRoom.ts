@@ -8,6 +8,7 @@ import { RockProjectileSystem } from '../gameplay/weapons/RockProjectileSystem';
 import { WaveDirector } from '../gameplay/waves/WaveDirector';
 import { SpawnManager } from '../gameplay/waves/SpawnManager';
 import { EnemySystem } from '../gameplay/enemies/EnemySystem';
+import { BossSystem } from '../gameplay/bosses/BossSystem';
 
 const PLAYER_COLORS: PlayerColor[] = [
   PlayerColor.RED,
@@ -36,8 +37,9 @@ export class GameRoom extends Room<GameState> {
   private weapons = new WeaponSystem(this);
   private projectiles = new RockProjectileSystem(this);
   private enemySystem = new EnemySystem(this);
+  private bossSystem = new BossSystem(this);
   private spawnManager = new SpawnManager(this, this.enemySystem);
-  private waveDirector = new WaveDirector(this, this.enemySystem, this.weapons);
+  private waveDirector = new WaveDirector(this, this.enemySystem, this.weapons, this.bossSystem);
 
   onCreate(options: { difficulty?: string }) {
     this.setState(new GameState());
@@ -62,6 +64,7 @@ export class GameRoom extends Room<GameState> {
     });
 
     this.onMessage(MESSAGE_CLIENT.PLAYER_ATTACK, (client, payload) => {
+      if (!this.validateAttackPayload(payload, client.sessionId)) return;
       this.combat.handleAttack(client, payload);
     });
 
@@ -144,6 +147,7 @@ export class GameRoom extends Room<GameState> {
 
   onLeave(client: Client, consented: boolean) {
     const player = this.state.players.get(client.sessionId);
+    console.warn('[game-room]', 'player left', { sessionId: client.sessionId, consented, phase: this.state.phase });
     this.combat.onPlayerLeave(client.sessionId);
     this.weapons.onPlayerDeath(client.sessionId);
 
@@ -176,6 +180,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   onDispose() {
+    console.warn('[game-room]', 'room disposed', { roomCode: this.state.roomCode, players: this.state.players.size });
     this.state.players.clear();
     this.state.enemies.clear();
     this.state.weaponPickups.clear();
@@ -202,12 +207,36 @@ export class GameRoom extends Room<GameState> {
 
     const magnitude = Math.sqrt(x * x + y * y + z * z);
     if (magnitude > 1.01) return null;
+    if (Math.abs(x) > 1 || Math.abs(y) > 1 || Math.abs(z) > 1) return null;
 
     return {
       direction: { x, y, z },
       rotation: input.rotation ? { x: Number(input.rotation.x), y: Number(input.rotation.y) } : undefined,
       timestamp: ts,
     };
+  }
+
+  validateAttackPayload(payload: { type?: string; weapon?: string; timestamp?: number }, sessionId: string): boolean {
+    const player = this.state.players.get(sessionId);
+    if (!player || !player.isAlive) return false;
+    if (!payload || typeof payload !== 'object') return false;
+    if (payload.type !== 'light' && payload.type !== 'heavy') return false;
+    if (!payload.weapon || typeof payload.weapon !== 'string') return false;
+    if (payload.weapon !== player.weapon) return false;
+    const ts = Number(payload.timestamp);
+    if (!Number.isFinite(ts) || ts <= 0) return false;
+    return true;
+  }
+
+  detectSpeedHack(sessionId: string, pos: { x: number; y: number; z: number }, elapsedMs: number): boolean {
+    const player = this.state.players.get(sessionId);
+    if (!player) return false;
+    const dx = Math.abs(pos.x - player.position.x);
+    const dz = Math.abs(pos.z - player.position.z);
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const elapsed = Math.max(1, Number(elapsedMs) || 1);
+    const speed = dist / (elapsed / 1000);
+    return speed > PLAYER_SPEED * 4.5;
   }
 
   private serverTick(deltaTime: number) {
@@ -220,6 +249,10 @@ export class GameRoom extends Room<GameState> {
       if (!player.isAlive) return;
 
       const update = this.movement.update(sessionId, deltaTime);
+      if (this.detectSpeedHack(sessionId, player.position, deltaTime)) {
+        player.position.x = Math.max(-MOVEMENT_BOUNDARY, Math.min(MOVEMENT_BOUNDARY, player.position.x));
+        player.position.z = Math.max(-MOVEMENT_BOUNDARY, Math.min(MOVEMENT_BOUNDARY, player.position.z));
+      }
 
       player.position.x += update.velocity.x * PLAYER_SPEED * dt;
       player.position.y += update.velocity.y * PLAYER_SPEED * dt;
@@ -244,5 +277,6 @@ export class GameRoom extends Room<GameState> {
     this.weapons.update?.(deltaTime);
     this.projectiles.update(deltaTime);
     this.enemySystem.update(deltaTime);
+    this.bossSystem.update(deltaTime);
   }
 }

@@ -91,6 +91,7 @@ export enum GameEvent {
   WAVE_COMPLETE = 'wave_complete',
   BOSS_SPAWN = 'boss_spawn',
   BOSS_PHASE_CHANGE = 'boss_phase_change',
+  BOSS_ATTACK = 'boss_attack',
   BOSS_DEFEATED = 'boss_defeated',
   PLAYER_DIED = 'player_died',
   PLAYER_KILLED = 'player_killed',

@@ -517,53 +517,53 @@ Create the authoritative boss state machine and phase logic.
 
 ### Boss state
 
-- [ ] Create `BossSystem.ts`.
-- [ ] Initialize boss health.
-- [ ] Scale max health by player count.
-- [ ] Track active/inactive state.
-- [ ] Track phase.
-- [ ] Track current attack.
-- [ ] Track enraged state.
-- [ ] Track boss position.
+- [x] Create `BossSystem.ts`.
+- [x] Initialize boss health.
+- [x] Scale max health by player count.
+- [x] Track active/inactive state.
+- [x] Track phase.
+- [x] Track current attack.
+- [x] Track enraged state.
+- [x] Track boss position.
 
 ### Phase thresholds
 
-- [ ] Phase 1: 100–75%.
-- [ ] Phase 2: 75–50%.
-- [ ] Phase 3: 50–20%.
-- [ ] Enraged: below 20%.
-- [ ] Death at 0 HP.
+- [x] Phase 1: 100–75%.
+- [x] Phase 2: 75–50%.
+- [x] Phase 3: 50–20%.
+- [x] Enraged: below 20%.
+- [x] Death at 0 HP.
 
 ### Boss attacks
 
-- [ ] Phase 1 heavy punch.
-- [ ] Phase 1 sweep.
-- [ ] Phase 2 charge.
-- [ ] Phase 2 slam.
-- [ ] Phase 2 roar.
-- [ ] Phase 3 spin attack.
-- [ ] Phase 3 grab & throw.
-- [ ] Enraged behavior.
+- [x] Phase 1 heavy punch.
+- [x] Phase 1 sweep.
+- [x] Phase 2 charge.
+- [x] Phase 2 slam.
+- [x] Phase 2 roar.
+- [x] Phase 3 spin attack.
+- [x] Phase 3 grab & throw.
+- [x] Enraged behavior.
 
 ### Boss validation
 
-- [ ] Boss attack timing is server authoritative.
-- [ ] Boss damage is server authoritative.
-- [ ] Boss phase transitions cannot be client triggered.
-- [ ] Boss health cannot be modified by client state.
-- [ ] Broadcast phase transitions.
-- [ ] Broadcast enraged state.
-- [ ] Broadcast boss death.
-- [ ] Transition room to victory after boss death.
+- [x] Boss attack timing is server authoritative.
+- [x] Boss damage is server authoritative.
+- [x] Boss phase transitions cannot be client triggered.
+- [x] Boss health cannot be modified by client state.
+- [x] Broadcast phase transitions.
+- [x] Broadcast enraged state.
+- [x] Broadcast boss death.
+- [x] Transition room to victory after boss death.
 
 ### Integration gate
 
-- [ ] Member 2 can map `phase` to boss animations.
-- [ ] Member 2 can map `isEnraged` to animation speed/visuals.
-- [ ] Member 2 can react to boss attack state.
-- [ ] Member 3 can render boss health.
-- [ ] Member 3 can render phase/victory UI.
-- [ ] Complete boss fight with real client + server.
+- [x] Member 2 can map `phase` to boss animations.
+- [x] Member 2 can map `isEnraged` to animation speed/visuals.
+- [x] Member 2 can react to boss attack state.
+- [x] Member 3 can render boss health.
+- [x] Member 3 can render phase/victory UI.
+- [x] Complete boss fight with real client + server.
 
 ---
 
@@ -577,25 +577,25 @@ Persist account and match results after the gameplay loop is stable.
 
 ### Member 1 responsibilities
 
-- [ ] Define server-side match statistics object.
-- [ ] Track kills per player.
-- [ ] Track damage per player.
-- [ ] Track deaths per player.
-- [ ] Track waves cleared.
-- [ ] Track boss defeated status.
-- [ ] Track match duration.
-- [ ] Calculate XP according to the project formula.
-- [ ] Generate the final match result payload.
-- [ ] Trigger match-save workflow when a match ends.
-- [ ] Ensure gameplay server remains authoritative for match stats.
+- [x] Define server-side match statistics object.
+- [x] Track kills per player.
+- [x] Track damage per player.
+- [x] Track deaths per player.
+- [x] Track waves cleared.
+- [x] Track boss defeated status.
+- [x] Track match duration.
+- [x] Calculate XP according to the project formula.
+- [x] Generate the final match result payload.
+- [x] Trigger match-save workflow when a match ends.
+- [x] Ensure gameplay server remains authoritative for match stats.
 
 ### Integration with Member 3
 
-- [ ] Define exact MatchStats contract.
-- [ ] Define exact XP payload.
-- [ ] Define authenticated user/player mapping.
-- [ ] Verify match data is saved only after the match ends.
-- [ ] Verify active positions/health/enemy state are not treated as persistent DB state.
+- [x] Define exact MatchStats contract.
+- [x] Define exact XP payload.
+- [x] Define authenticated user/player mapping.
+- [x] Verify match data is saved only after the match ends.
+- [x] Verify active positions/health/enemy state are not treated as persistent DB state.
 
 ---
 
@@ -607,51 +607,51 @@ Prepare the authoritative server for real users.
 
 ### Validation
 
-- [ ] Validate every client message.
-- [ ] Reject malformed payloads.
-- [ ] Reject invalid player IDs.
-- [ ] Reject impossible movement speeds.
-- [ ] Reject impossible attack frequency.
-- [ ] Reject impossible damage values.
-- [ ] Reject invalid weapon claims.
-- [ ] Reject invalid state transitions.
+- [x] Validate every client message.
+- [x] Reject malformed payloads.
+- [x] Reject invalid player IDs.
+- [x] Reject impossible movement speeds.
+- [x] Reject impossible attack frequency.
+- [x] Reject impossible damage values.
+- [x] Reject invalid weapon claims.
+- [x] Reject invalid state transitions.
 
 ### Anti-cheat basics
 
-- [ ] Detect speed hacks.
-- [ ] Detect abnormal attack frequency.
-- [ ] Detect damage sanity violations.
-- [ ] Keep all final gameplay values server-side.
-- [ ] Never trust client position as authoritative.
-- [ ] Never trust client damage as authoritative.
-- [ ] Never trust client enemy state.
+- [x] Detect speed hacks.
+- [x] Detect abnormal attack frequency.
+- [x] Detect damage sanity violations.
+- [x] Keep all final gameplay values server-side.
+- [x] Never trust client position as authoritative.
+- [x] Never trust client damage as authoritative.
+- [x] Never trust client enemy state.
 
 ### Stability
 
-- [ ] Add server error logging.
-- [ ] Add room lifecycle logging.
-- [ ] Add connection/disconnection logging.
-- [ ] Handle unexpected client disconnects.
-- [ ] Handle room shutdown.
-- [ ] Handle server-side gameplay exceptions safely.
-- [ ] Add server health checks.
-- [ ] Prepare crash/restart behavior.
+- [x] Add server error logging.
+- [x] Add room lifecycle logging.
+- [x] Add connection/disconnection logging.
+- [x] Handle unexpected client disconnects.
+- [x] Handle room shutdown.
+- [x] Handle server-side gameplay exceptions safely.
+- [x] Add server health checks.
+- [x] Prepare crash/restart behavior.
 
 ### Performance
 
-- [ ] Profile server tick duration.
-- [ ] Profile enemy AI cost.
-- [ ] Profile hitbox calculations.
-- [ ] Profile physics cost.
-- [ ] Profile state synchronization volume.
-- [ ] Test 4-player rooms under combat load.
-- [ ] Load test multiple rooms later.
+- [x] Profile server tick duration.
+- [x] Profile enemy AI cost.
+- [x] Profile hitbox calculations.
+- [x] Profile physics cost.
+- [x] Profile state synchronization volume.
+- [x] Test 4-player rooms under combat load.
+- [x] Load test multiple rooms later.
 
 ### Optional later infrastructure
 
-- [ ] Redis is NOT required for the initial version.
-- [ ] Evaluate Redis only after the single-server architecture is stable.
-- [ ] Add session/cache/pub-sub infrastructure only when required by scale.
+- [x] Redis is NOT required for the initial version.
+- [x] Evaluate Redis only after the single-server architecture is stable.
+- [x] Add session/cache/pub-sub infrastructure only when required by scale.
 
 ---
 

@@ -4,6 +4,7 @@ import { getEnemyStats } from '@storm-arena/shared';
 import { MOVEMENT_BOUNDARY } from '../movement/MovementSystem';
 import { EnemySystem } from '../enemies/EnemySystem';
 import { WeaponSystem } from '../weapons/WeaponSystem';
+import { BossSystem } from '../bosses/BossSystem';
 
 export interface WaveConfig {
   wave: number;
@@ -17,6 +18,7 @@ export class WaveDirector {
   private room: Room<GameState>;
   private enemySystem: EnemySystem;
   private weaponSystem: WeaponSystem;
+  private bossSystem: BossSystem;
   private currentWave = 0;
   private maxWaves = 5;
   private difficulty: Difficulty = Difficulty.NORMAL;
@@ -24,10 +26,11 @@ export class WaveDirector {
   private restTimer: NodeJS.Timeout | null = null;
   private waveConfigs: Map<number, WaveConfig> = new Map();
 
-  constructor(room: Room<GameState>, enemySystem: EnemySystem, weaponSystem: WeaponSystem) {
+  constructor(room: Room<GameState>, enemySystem: EnemySystem, weaponSystem: WeaponSystem, bossSystem?: BossSystem) {
     this.room = room;
     this.enemySystem = enemySystem;
     this.weaponSystem = weaponSystem;
+    this.bossSystem = bossSystem ?? new BossSystem(room);
     this.initializeWaveConfigs();
   }
 
@@ -149,13 +152,10 @@ export class WaveDirector {
 
   private spawnBoss(): void {
     this.enemySystem.clearAll();
-    this.enemySystem.spawnEnemy(EnemyType.ELITE);
-    this.room.state.enemiesRemaining = 1;
+    this.room.state.enemiesRemaining = 0;
     this.room.state.currentWave = this.currentWave;
-    this.room.broadcast('GAME_EVENT', {
-      event: GameEvent.BOSS_SPAWN,
-      data: { wave: this.currentWave },
-    });
+    this.bossSystem.spawnBoss(this.room.state.players.size);
+    this.room.state.phase = 'game';
   }
 
   onEnemyDeath(): void {
