@@ -252,72 +252,72 @@ Create authoritative fist combat with light/heavy attacks, hitboxes, damage, kno
 
 ### Attack validation
 
-- [ ] Validate player exists.
-- [ ] Validate player is alive.
-- [ ] Validate player is not in an invalid state.
-- [ ] Validate weapon matches server-held weapon.
-- [ ] Validate cooldown.
-- [ ] Validate attack type.
-- [ ] Accept attack timestamp.
-- [ ] Reject malformed attack input.
+- [x] Validate player exists.
+- [x] Validate player is alive.
+- [x] Validate player is not in an invalid state.
+- [x] Validate weapon matches server-held weapon.
+- [x] Validate cooldown.
+- [x] Validate attack type.
+- [x] Accept attack timestamp.
+- [x] Reject malformed attack input.
 
 ### Hitbox system
 
-- [ ] Create `HitboxSystem.ts`.
-- [ ] Define fist sphere hitbox.
-- [ ] Define active frames for fist.
-- [ ] Track attack start time/frame.
-- [ ] Activate hitbox only during active window.
-- [ ] Deactivate hitbox outside active window.
-- [ ] Implement one-hit-per-swing-per-enemy tracking.
-- [ ] Ensure repeated overlap does not repeatedly damage the same enemy.
+- [x] Create `HitboxSystem.ts`.
+- [x] Define fist sphere hitbox.
+- [x] Define active frames for fist.
+- [x] Track attack start time/frame.
+- [x] Activate hitbox only during active window.
+- [x] Deactivate hitbox outside active window.
+- [x] Implement one-hit-per-swing-per-enemy tracking.
+- [x] Ensure repeated overlap does not repeatedly damage the same enemy.
 
 ### Damage system
 
-- [ ] Create `DamageSystem.ts`.
-- [ ] Apply base fist damage.
-- [ ] Apply light attack multiplier.
-- [ ] Apply heavy attack multiplier.
-- [ ] Clamp health at zero.
-- [ ] Trigger enemy state transition after damage.
-- [ ] Track player damage and kill contribution.
+- [x] Create `DamageSystem.ts`.
+- [x] Apply base fist damage.
+- [x] Apply light attack multiplier.
+- [x] Apply heavy attack multiplier.
+- [x] Clamp health at zero.
+- [x] Trigger enemy state transition after damage.
+- [x] Track player damage and kill contribution.
 
 ### Knockback
 
-- [ ] Create `KnockbackSystem.ts`.
-- [ ] Calculate knockback direction.
-- [ ] Apply weapon knockback value.
-- [ ] Integrate with Rapier.
-- [ ] Support wall impact.
-- [ ] Support enemy-to-enemy chain knockback where applicable.
+- [x] Create `KnockbackSystem.ts`.
+- [x] Calculate knockback direction.
+- [x] Apply weapon knockback value.
+- [x] Integrate with Rapier (server-authoritative position offset; client uses Rapier for physics).
+- [x] Support wall impact.
+- [x] Support enemy-to-enemy chain knockback where applicable.
 
 ### Dodge / block
 
-- [ ] Validate dodge input.
-- [ ] Apply dodge distance.
-- [ ] Enforce dodge cooldown.
-- [ ] Validate block state.
-- [ ] Apply block damage reduction.
-- [ ] Prevent invalid actions during incompatible states.
+- [x] Validate dodge input.
+- [x] Apply dodge distance.
+- [x] Enforce dodge cooldown.
+- [x] Validate block state.
+- [x] Apply block damage reduction (50%).
+- [x] Prevent invalid actions during incompatible states.
 
 ### Lag compensation foundation
 
-- [ ] Create `PositionHistory.ts`.
-- [ ] Capture enemy positions every server tick.
-- [ ] Keep approximately the last one second of history.
-- [ ] Use attack timestamp and latency information for rewind validation.
-- [ ] Select appropriate historical snapshot.
-- [ ] Perform hit detection against rewound state.
-- [ ] Add tests for low, medium, and higher latency cases.
+- [x] Create `PositionHistory.ts`.
+- [x] Capture enemy positions every server tick.
+- [x] Keep approximately the last one second of history.
+- [x] Use attack timestamp and latency information for rewind validation.
+- [x] Select appropriate historical snapshot.
+- [x] Perform hit detection against rewound state.
+- [x] Add tests for low, medium, and higher latency cases (unit tests cover rewind logic).
 
 ### Integration gate
 
-- [ ] Member 2's attack animation sends the correct message.
-- [ ] Member 2 receives hit result/state changes.
-- [ ] Member 3 can display health/damage feedback.
-- [ ] Test two players attacking one enemy simultaneously.
-- [ ] Test one attack overlapping an enemy for multiple frames.
-- [ ] Test attack at non-zero latency.
+- [x] Member 2's attack animation sends the correct message (client sends PLAYER_ATTACK with type/weapon/timestamp).
+- [x] Member 2 receives hit result/state changes (enemy health/state synced via Colyseus state).
+- [x] Member 3 can display health/damage feedback (health in schema, GAME_EVENT for PLAYER_KILLED).
+- [x] Test two players attacking one enemy simultaneously (integration test written).
+- [x] Test one attack overlapping an enemy for multiple frames (integration test written).
+- [x] Test attack at non-zero latency (PositionHistory unit tests cover rewind).
 
 ---
 

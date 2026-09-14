@@ -1,8 +1,8 @@
 import { Room, Client } from 'colyseus';
-import { GameState, Player } from '@storm-arena/shared';
-import { RoomPhase, Difficulty, PlayerColor, PlayerState, WeaponType } from '@storm-arena/shared';
-import { MESSAGE_CLIENT } from '@storm-arena/shared';
+import { GameState, Player, Enemy } from '@storm-arena/shared';
+import { RoomPhase, Difficulty, PlayerColor, PlayerState, WeaponType, EnemyType, EnemyState, GameEvent, MESSAGE_CLIENT } from '@storm-arena/shared';
 import { MovementSystem, PLAYER_SPEED, MOVEMENT_BOUNDARY, MovementInput } from '../gameplay/movement/MovementSystem';
+import { CombatManager } from '../gameplay/combat/CombatManager';
 
 const PLAYER_COLORS: PlayerColor[] = [
   PlayerColor.RED,
@@ -27,6 +27,7 @@ function generateRoomCode(): string {
 export class GameRoom extends Room<GameState> {
   maxClients = MAX_PLAYERS;
   private movement = new MovementSystem();
+  private combat = new CombatManager(this);
 
   onCreate(options: { difficulty?: string }) {
     this.setState(new GameState());
@@ -59,6 +60,7 @@ export class GameRoom extends Room<GameState> {
       if (playerCount < 2) return;
 
       this.state.phase = RoomPhase.GAME;
+      this.spawnTestEnemies();
     });
 
     this.onMessage(MESSAGE_CLIENT.HOST_CHANGE_DIFFICULTY, (client, payload: { difficulty: string }) => {
@@ -102,6 +104,8 @@ export class GameRoom extends Room<GameState> {
 
   onLeave(client: Client, consented: boolean) {
     const player = this.state.players.get(client.sessionId);
+    this.combat.onPlayerLeave(client.sessionId);
+
     if (this.state.phase === RoomPhase.LOBBY) {
       this.state.players.delete(client.sessionId);
       this.movement.clear(client.sessionId);
@@ -114,14 +118,9 @@ export class GameRoom extends Room<GameState> {
         }
       }
     } else if (player) {
-      // Hold the player's slot for the reconnect window. Clear movement so the
-      // held player freezes in place instead of drifting on their last velocity.
       this.movement.clear(client.sessionId);
 
-      // allowReconnection takes SECONDS (colyseus semantics), not milliseconds.
       this.allowReconnection(client, RECONNECT_TIMEOUT_MS / 1000).then(() => {
-        // colyseus preserves the original sessionId on reconnect, so the player
-        // entry — position, rotation, health, weapon, alive state — is restored as-is.
         const restored = this.state.players.get(client.sessionId);
         if (restored) {
           restored.sessionId = client.sessionId;
@@ -140,6 +139,43 @@ export class GameRoom extends Room<GameState> {
     this.state.enemies.clear();
     this.state.weaponPickups.clear();
     this.movement.clearAll();
+  }
+
+  private spawnTestEnemies(): void {
+    const enemy1 = new Enemy();
+    enemy1.id = 'test-enemy-1';
+    enemy1.type = EnemyType.BASIC;
+    enemy1.health = 50;
+    enemy1.maxHealth = 50;
+    enemy1.state = EnemyState.IDLE;
+    enemy1.position.x = -4.5;
+    enemy1.position.y = 0;
+    enemy1.position.z = 0;
+    this.state.enemies.set(enemy1.id, enemy1);
+
+    const enemy2 = new Enemy();
+    enemy2.id = 'test-enemy-2';
+    enemy2.type = EnemyType.BASIC;
+    enemy2.health = 50;
+    enemy2.maxHealth = 50;
+    enemy2.state = EnemyState.IDLE;
+    enemy2.position.x = -5;
+    enemy2.position.y = 0;
+    enemy2.position.z = 0.5;
+    this.state.enemies.set(enemy2.id, enemy2);
+
+    const enemy3 = new Enemy();
+    enemy3.id = 'test-enemy-3';
+    enemy3.type = EnemyType.BASIC;
+    enemy3.health = 50;
+    enemy3.maxHealth = 50;
+    enemy3.state = EnemyState.IDLE;
+    enemy3.position.x = -3;
+    enemy3.position.y = 0;
+    enemy3.position.z = -1;
+    this.state.enemies.set(enemy3.id, enemy3);
+
+    this.state.enemiesRemaining = this.state.enemies.size;
   }
 
   private normalizeMoveInput(input: MovementInput): MovementInput | null {
@@ -193,7 +229,11 @@ export class GameRoom extends Room<GameState> {
         player.rotation.z = update.rotation.z ?? 0;
       }
 
-      player.state = update.hasInput ? PlayerState.RUNNING : PlayerState.IDLE;
+      if (player.state !== PlayerState.ATTACKING && player.state !== PlayerState.DODGING && player.state !== PlayerState.BLOCKING) {
+        player.state = update.hasInput ? PlayerState.RUNNING : PlayerState.IDLE;
+      }
     });
+
+    this.combat.update(deltaTime);
   }
 }

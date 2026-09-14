@@ -1,5 +1,6 @@
 export const PLAYER_SPEED = 5.0;
 export const MOVEMENT_BOUNDARY = 20;
+export const TICK_INTERVAL_MS = 50;
 export const MAX_STORED_INPUTS_PER_PLAYER = 64;
 
 export interface MovementInput {

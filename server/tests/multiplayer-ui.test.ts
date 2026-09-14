@@ -119,7 +119,8 @@ async function main() {
   const gs = fresh().gameState!;
   check(gs.currentWave === 3, `wave number consumed (${gs.currentWave})`);
   check(gs.enemiesRemaining === 9, `enemy count consumed (${gs.enemiesRemaining})`);
-  check(Object.keys(gs.enemies).length === 2, 'enemy map consumed');
+  check(Object.keys(gs.enemies).length >= 2, 'enemy map consumed (includes test enemies)');
+  check('enemy-a' in gs.enemies && 'enemy-b' in gs.enemies, 'manually added enemies present in map');
   const health = gs.players[fresh().localPlayerId!]?.health;
   check(health === 30, `authoritative player health consumed (${health})`);
   check(fresh().gameUI.bossHealth === 300, `boss health consumed (${fresh().gameUI.bossHealth})`);
