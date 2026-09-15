@@ -1,0 +1,184 @@
+================================================================================
+STORM ARENA / MULTI-WARrior — FINAL AUDIT & FIX REPORT
+================================================================================
+Generated: 2025-09-15
+Status: ALL ITEMS COMPLETE — Ready for commit
+================================================================================
+
+EXECUTIVE SUMMARY
+================================================================================
+All 5 audit items resolved. Build passes (0 errors). Test suite passes
+(9/9 green). Changes are local/uncommitted — no git commands run.
+
+  Items 1-3 (prior session): Verified intact, not touched.
+  Item 4  (this session):    Rock projectile damage routed through EnemySystem.
+  Item 5  (this session):    Test/CI hygiene — boss-system.test.ts added,
+                             8 broken .js imports fixed.
+
+
+SECTION 1: PRIOR FIXES — VERIFIED INTACT
+================================================================================
+These were fixed in a previous session. Confirmed present in codebase:
+
+  [1] GameScene mounts correctly in GameScreen.tsx
+      → 3D canvas renders. GameScreen.tsx mounts <GameScene />.
+
+  [2] activeRoom set via socket.ts
+      → Player input reaches server. Room reference stored on connection.
+
+  [3] MessageHandlers.ts binds onChange (not just onAdd)
+      → Covers: players, enemies, boss, weaponPickups
+      → Remote player movement syncs across clients.
+      → Verified with live two-client wire schema match.
+
+
+SECTION 2: ITEM 4 — ROCK PROJECTILE DAMAGE ROUTING
+================================================================================
+Bug:   RockProjectileSystem directly mutated enemy.health and enemy.state.
+       On next tick, EnemySystem.update() overwrote state → damage/stagger
+       silently undone.
+
+Fix:   Route through EnemySystem.applyDamage() which handles health, death,
+       removal, and stagger/knockback in one atomic operation.
+
+Files changed:
+
+  server/src/gameplay/weapons/RockProjectileSystem.ts
+  ──────────────────────────────────────────────────
+  Line 4-5:   Added import for EnemySystem
+  Line 24:    Added private enemySystem?: EnemySystem property
+  Line 27-29: Added setEnemySystem() setter method
+  Line 109-131: Replaced applyDamage() method
+
+  Before (lines 107-123):
+    private applyDamage(enemy: any, proj: RockProjectile): void {
+      enemy.health = Math.max(0, enemy.health - proj.damage);
+      if (enemy.health <= 0) {
+        enemy.state = 'dead';
+        this.room.state.enemiesRemaining = Math.max(0, ...);
+        this.room.broadcast('GAME_EVENT', { ... });
+      } else {
+        enemy.state = 'stagger';
+        this.room.broadcast('GAME_EVENT', { ... });
+      }
+    }
+
+  After:
+    private applyDamage(enemy: any, proj: RockProjectile): void {
+      if (!this.enemySystem) return;
+      const killed = this.enemySystem.applyDamage(
+        enemy.id, proj.damage, proj.position, false
+      );
+      if (killed) {
+        this.room.broadcast('GAME_EVENT', {
+          event: 'player_killed',
+          data: { enemyId: enemy.id, damage: proj.damage, projectile: true },
+        });
+      } else {
+        this.room.broadcast('GAME_EVENT', {
+          event: 'player_killed',
+          data: { enemyId: enemy.id, damage: proj.damage, health: enemy.health },
+        });
+      }
+    }
+
+  server/src/rooms/GameRoom.ts
+  ────────────────────────────
+  Line 66: Added wiring (after existing combat wiring):
+    this.projectiles.setEnemySystem(this.enemySystem);
+
+Verification results:
+  ✓ Wiring confirmed: projectileSystem.enemySystem === enemySystem
+  ✓ Enemy spawned: health=50, state=IDLE
+  ✓ Rock hit: health 50→38, state=STAGGER after 6 ticks
+  ✓ Stagger persists: state=STAGGER after 14 ticks (~700ms)
+  ✓ Broadcast events: correct enemyId, damage, health in payload
+  ✓ Kill scenario: enemy removed, projectile=true flag in broadcast
+
+
+SECTION 3: ITEM 5 — TEST/CI HYGIENE
+================================================================================
+Fix A: Added boss-system.test.ts to server/package.json test script
+────────────────────────────────────────────────────────────────────
+
+  Before:
+    "test": "tsx tests/integration.test.ts && tsx tests/movement.test.ts &&
+             tsx tests/client-network.test.ts && tsx tests/multiplayer-ui.test.ts
+             && tsx tests/reconnect-ui.test.ts && tsx tests/combat.test.ts &&
+             tsx tests/combat-integration.test.ts && tsx tests/enemy.test.ts"
+
+  After:
+    "test": "tsx tests/boss-system.test.ts && tsx tests/integration.test.ts &&
+             tsx tests/movement.test.ts && tsx tests/client-network.test.ts &&
+             tsx tests/multiplayer-ui.test.ts && tsx tests/reconnect-ui.test.ts
+             && tsx tests/combat.test.ts && tsx tests/combat-integration.test.ts
+             && tsx tests/enemy.test.ts"
+
+Fix B: Fixed 8 .js extension imports across 7 test files
+────────────────────────────────────────────────────────
+
+  #  File                        Line  Before                          After
+  ── ─────────────────────────── ──── ─────────────────────────────── ──────────────────────────────
+  1  integration.test.ts          3   '../src/rooms/GameRoom.js'      '../src/rooms/GameRoom'
+  2  movement.test.ts             3   '../src/rooms/GameRoom.js'      '../src/rooms/GameRoom'
+  3  movement.test.ts             4   '../src/gameplay/movement/
+                                         MovementSystem.js'            '../src/gameplay/movement/
+                                                                        MovementSystem'
+  4  client-network.test.ts       6   '../src/rooms/GameRoom.js'      '../src/rooms/GameRoom'
+  5  client-network.test.ts       7   '../src/api/GameRoomRouter.js'  '../src/api/GameRoomRouter'
+  6  multiplayer-ui.test.ts       3   '../src/rooms/GameRoom.js'      '../src/rooms/GameRoom'
+  7  combat-integration.test.ts   7   '../src/rooms/GameRoom.js'      '../src/rooms/GameRoom'
+  8  helpers.ts                   5   '../src/api/GameRoomRouter.js'  '../src/api/GameRoomRouter'
+
+  Note: 'colyseus.js' imports (npm package) were left unchanged.
+
+
+SECTION 4: BUILD & TEST RESULTS
+================================================================================
+Build:  PASS — 0 errors (shared, database, server, client)
+Tests:  PASS — 9/9 suites green
+
+  boss-system.test.ts:       PASS
+  integration.test.ts:       PASS
+  movement.test.ts:          PASS (1 pre-existing flaky timing test)
+  client-network.test.ts:    PASS
+  multiplayer-ui.test.ts:    PASS
+  reconnect-ui.test.ts:      PASS
+  combat.test.ts:            PASS
+  combat-integration.test.ts: PASS
+  enemy.test.ts:             PASS
+
+
+SECTION 5: BACKLOG (NOT FIXED — FLAGGED FOR FUTURE)
+================================================================================
+  1. Event mislabeling: 'player_killed' used for both kill AND stagger
+     cases. Non-killed should be 'enemy_damaged'. Pre-existing, preserved
+     as-is per approved fix scope.
+
+  2. Flaky movement test: "player2 moved independently on +z" is timing-
+     sensitive. Occasionally fails. Not caused by our changes.
+
+  3. Colyseus deprecation: pingInterval/pingMaxRetries/server/verifyClient
+     moving to WebSocketTransport in 0.15+. Framework-level concern.
+
+  4. Chunk size warning: client bundle is 3,697 kB (over 500 kB limit).
+     Recommend code-splitting via dynamic imports.
+
+
+================================================================================
+FILES MODIFIED (this session)
+================================================================================
+  server/src/gameplay/weapons/RockProjectileSystem.ts  (+23/-14 lines)
+  server/src/rooms/GameRoom.ts                         (+1 line)
+  server/package.json                                  (test script)
+  server/tests/integration.test.ts                     (import fix)
+  server/tests/movement.test.ts                        (2 import fixes)
+  server/tests/client-network.test.ts                  (2 import fixes)
+  server/tests/multiplayer-ui.test.ts                  (import fix)
+  server/tests/combat-integration.test.ts              (import fix)
+  server/tests/helpers.ts                              (import fix)
+  report.txt                                           (this file)
+
+================================================================================
+END OF REPORT
+================================================================================

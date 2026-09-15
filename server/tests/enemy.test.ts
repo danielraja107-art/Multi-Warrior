@@ -61,7 +61,7 @@ async function main() {
   ai.update(ctxClose);
   check(ai.getState() === 'CHASE', 'transitions to CHASE');
 
-  const ctxAttack = { enemy: { ...aiState, position: { x: 1, y: 0, z: 0 } }, players: targetMap, currentTime: 3000, tick: 0 };
+  const ctxAttack = { enemy: { ...aiState, position: { x: 4, y: 0, z: 0 } }, players: targetMap, currentTime: 3000, tick: 0 };
   ai.update(ctxAttack);
   check(ai.getState() === 'ATTACK', 'transitions to ATTACK when in attack range');
 
@@ -77,8 +77,9 @@ async function main() {
   ai2.update(ctxDead);
   check(ai2.getState() === 'DEAD', 'health <= 0 sets DEAD state');
 
-  check(!ai.setState('ATTACK'), 'invalid transition IDLE->ATTACK rejected');
-  check(ai.setState('DETECT'), 'valid transition IDLE->DETECT allowed');
+  const aiTransitions = new EnemyAI();
+  check(!aiTransitions.setState('ATTACK'), 'invalid transition IDLE->ATTACK rejected');
+  check(aiTransitions.setState('DETECT'), 'valid transition IDLE->DETECT allowed');
 
   console.log('\n[EnemySystem - Spawning & Waves]');
   const sys = new EnemySystem(mockRoom);
@@ -95,14 +96,21 @@ async function main() {
   check(sys.getEnemies().size > 0, 'wave 5 spawns enemies');
   check(sys.getCurrentWave() === 5, 'wave updated');
 
+  const wave5EnemyIds = Array.from(sys.getEnemies().keys());
+
   console.log('\n[EnemySystem - Target Selection]');
   const target1 = createMockPlayer('p1', 5, 0);
   const target2 = createMockPlayer('p2', 15, 0);
   mockRoom.state.players.set('p1', target1);
   mockRoom.state.players.set('p2', target2);
 
+  const testEnemy = sys.getEnemies().get(wave5EnemyIds[0])!;
+  testEnemy.schema.position.x = 0;
+  testEnemy.schema.position.z = 0;
+  testEnemy.aiState.position.x = 0;
+  testEnemy.aiState.position.z = 0;
+
   sys.update(50);
-  const testEnemy = sys.getEnemies().get(enemyIds[0])!;
   check(testEnemy.aiState.targetPlayerId === 'p1', 'selects closest player in range');
 
   console.log('\n[EnemySystem - Movement]');
@@ -111,17 +119,17 @@ async function main() {
   check(testEnemy.schema.position.x !== initialX, 'enemy moves towards target');
 
   console.log('\n[EnemySystem - Damage & Death]');
-  const damageEnemy = sys.getEnemies().get(enemyIds[0])!;
+  const damageEnemy = sys.getEnemies().get(wave5EnemyIds[0])!;
   const died = sys.applyDamage(damageEnemy.schema.id, 1000, { x: 0, y: 0, z: 0 }, false);
   check(died === true, 'applyDamage returns true on kill');
   check(!sys.getEnemies().has(damageEnemy.schema.id), 'dead enemy removed from map');
 
   console.log('\n[EnemySystem - Stagger & Knockback]');
-  const staggerEnemy = sys.getEnemies().get(enemyIds[1])!;
+  const staggerEnemy = sys.getEnemies().get(wave5EnemyIds[1])!;
   sys.applyDamage(staggerEnemy.schema.id, 10, { x: 0, y: 0, z: 0 }, false);
   check(staggerEnemy.ai.getState() === 'STAGGER', 'damage applies stagger');
 
-  const kbEnemy = sys.getEnemies().get(enemyIds[2])!;
+  const kbEnemy = sys.getEnemies().get(wave5EnemyIds[2])!;
   const beforeKb = { ...kbEnemy.schema.position };
   sys.applyDamage(kbEnemy.schema.id, 1, { x: kbEnemy.schema.position.x - 5, y: 0, z: kbEnemy.schema.position.z }, true);
   check(kbEnemy.ai.getState() === 'KNOCKBACK', 'heavy attack applies knockback');

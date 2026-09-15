@@ -21,6 +21,7 @@
     "db:deploy": "npm run db:deploy --workspace=database",
     "db:seed": "npm run db:seed --workspace=database",
     "db:studio": "npm run db:studio --workspace=database",
+    "test": "npm run test --workspace=server",
     "test:api": "npm run test:api --workspace=server",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write \"**/*.ts\""

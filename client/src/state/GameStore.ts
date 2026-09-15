@@ -207,86 +207,86 @@ export const useGameStore = create<GameStore>((set) => ({
 export function toClientPlayer(p: {
   sessionId: string;
   color: string;
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  state: string;
-  health: number;
-  maxHealth: number;
-  weapon: string;
-  isHost: boolean;
-  isAlive: boolean;
+  position?: { x?: number; y?: number; z?: number };
+  rotation?: { x?: number; y?: number; z?: number };
+  state?: string;
+  health?: number;
+  maxHealth?: number;
+  weapon?: string;
+  isHost?: boolean;
+  isAlive?: boolean;
 }): ClientPlayerState {
   return {
     sessionId: p.sessionId,
-    color: p.color as PlayerColor,
-    position: { x: p.position.x, y: p.position.y, z: p.position.z },
-    rotation: { x: p.rotation.x, y: p.rotation.y, z: p.rotation.z },
-    state: p.state as PlayerState,
-    health: p.health,
-    maxHealth: p.maxHealth,
-    weapon: p.weapon as WeaponType,
-    isHost: p.isHost,
-    isAlive: p.isAlive,
+    color: (p.color as PlayerColor) || PlayerColor.RED,
+    position: { x: p.position?.x ?? 0, y: p.position?.y ?? 0, z: p.position?.z ?? 0 },
+    rotation: { x: p.rotation?.x ?? 0, y: p.rotation?.y ?? 0, z: p.rotation?.z ?? 0 },
+    state: (p.state as PlayerState) || PlayerState.IDLE,
+    health: p.health ?? 100,
+    maxHealth: p.maxHealth ?? 100,
+    weapon: (p.weapon as WeaponType) || WeaponType.FIST,
+    isHost: Boolean(p.isHost),
+    isAlive: p.isAlive ?? true,
   };
 }
 
 export function toClientEnemy(e: {
   id: string;
-  type: string;
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  state: string;
-  health: number;
-  maxHealth: number;
-  targetPlayerId: string;
+  type?: string;
+  position?: { x?: number; y?: number; z?: number };
+  rotation?: { x?: number; y?: number; z?: number };
+  state?: string;
+  health?: number;
+  maxHealth?: number;
+  targetPlayerId?: string;
 }): ClientEnemyState {
   return {
     id: e.id,
-    type: e.type,
-    position: { x: e.position.x, y: e.position.y, z: e.position.z },
-    rotation: { x: e.rotation.x, y: e.rotation.y, z: e.rotation.z },
-    state: e.state as EnemyState,
-    health: e.health,
-    maxHealth: e.maxHealth,
-    targetPlayerId: e.targetPlayerId,
+    type: e.type ?? 'basic',
+    position: { x: e.position?.x ?? 0, y: e.position?.y ?? 0, z: e.position?.z ?? 0 },
+    rotation: { x: e.rotation?.x ?? 0, y: e.rotation?.y ?? 0, z: e.rotation?.z ?? 0 },
+    state: (e.state as EnemyState) || EnemyState.IDLE,
+    health: e.health ?? 50,
+    maxHealth: e.maxHealth ?? 50,
+    targetPlayerId: e.targetPlayerId ?? '',
   };
 }
 
 export function toClientBoss(b: {
   id: string;
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  health: number;
-  maxHealth: number;
-  phase: string;
-  currentAttack: string;
-  isEnraged: boolean;
-  isActive: boolean;
+  position?: { x?: number; y?: number; z?: number };
+  rotation?: { x?: number; y?: number; z?: number };
+  health?: number;
+  maxHealth?: number;
+  phase?: string;
+  currentAttack?: string;
+  isEnraged?: boolean;
+  isActive?: boolean;
 }): ClientBossState {
   return {
     id: b.id,
-    position: { x: b.position.x, y: b.position.y, z: b.position.z },
-    rotation: { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z },
-    health: b.health,
-    maxHealth: b.maxHealth,
-    phase: b.phase as BossPhase,
-    currentAttack: b.currentAttack,
-    isEnraged: b.isEnraged,
-    isActive: b.isActive,
+    position: { x: b.position?.x ?? 0, y: b.position?.y ?? 0, z: b.position?.z ?? 0 },
+    rotation: { x: b.rotation?.x ?? 0, y: b.rotation?.y ?? 0, z: b.rotation?.z ?? 0 },
+    health: b.health ?? 500,
+    maxHealth: b.maxHealth ?? 500,
+    phase: (b.phase as BossPhase) || BossPhase.PHASE_1,
+    currentAttack: b.currentAttack ?? '',
+    isEnraged: Boolean(b.isEnraged),
+    isActive: Boolean(b.isActive),
   };
 }
 
 export function toClientWeaponPickup(w: {
   id: string;
-  type: string;
-  position: { x: number; y: number; z: number };
-  isAvailable: boolean;
+  type?: string;
+  position?: { x?: number; y?: number; z?: number };
+  isAvailable?: boolean;
 }): ClientWeaponPickupState {
   return {
     id: w.id,
-    type: w.type as WeaponType,
-    position: { x: w.position.x, y: w.position.y, z: w.position.z },
-    isAvailable: w.isAvailable,
+    type: (w.type as WeaponType) || WeaponType.STICK,
+    position: { x: w.position?.x ?? 0, y: w.position?.y ?? 0, z: w.position?.z ?? 0 },
+    isAvailable: Boolean(w.isAvailable),
   };
 }
 

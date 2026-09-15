@@ -46,6 +46,11 @@ export class EnemySystem {
     this.room = room;
   }
 
+  setWave(wave: number, difficulty?: string): void {
+    this.currentWave = wave;
+    if (difficulty) this.difficulty = difficulty;
+  }
+
   startWave(wave: number, difficulty: string): void {
     this.currentWave = wave;
     this.difficulty = difficulty;
@@ -149,6 +154,7 @@ export class EnemySystem {
       }
 
       const targetId = this.selectTarget(instance, players);
+      instance.schema.targetPlayerId = targetId;
       instance.aiState.targetPlayerId = targetId;
 
       const ctx: AIContext = {
@@ -184,7 +190,7 @@ export class EnemySystem {
       const dist = Math.sqrt(dx * dx + dz * dz);
       if (dist < closestDist && dist <= instance.aiState.detectionRange) {
         closestDist = dist;
-        closestId = id;
+        closestId = player.id || player.sessionId || id;
       }
     });
 
@@ -273,11 +279,16 @@ export class EnemySystem {
       return true;
     }
 
-    instance.ai.applyStagger(STAGGER_DURATION, this.room.state.elapsedTime);
     instance.aiState.health = instance.schema.health;
 
-    const kbDirection = this.calculateKnockbackDirection(instance.schema.position, attackerPos);
-    this.applyKnockback(instance, kbDirection);
+    if (isHeavy) {
+      const kbDirection = this.calculateKnockbackDirection(instance.schema.position, attackerPos);
+      this.applyKnockback(instance, kbDirection);
+    } else {
+      instance.ai.applyStagger(STAGGER_DURATION, this.room.state.elapsedTime);
+      instance.schema.state = EnemyState.STAGGER;
+      instance.aiState.state = EnemyState.STAGGER;
+    }
 
     return false;
   }
@@ -323,6 +334,31 @@ export class EnemySystem {
 
   isWaveComplete(): boolean {
     return this.enemies.size === 0 && this.currentWave > 0;
+  }
+
+  getInstance(enemyId: string): EnemyInstance | undefined {
+    return this.enemies.get(enemyId);
+  }
+
+  applyStagger(enemyId: string, durationMs = STAGGER_DURATION): void {
+    const instance = this.enemies.get(enemyId);
+    if (instance) {
+      instance.ai.applyStagger(durationMs, this.room.state.elapsedTime);
+      instance.schema.state = EnemyState.STAGGER;
+      instance.aiState.state = EnemyState.STAGGER;
+    }
+  }
+
+  applyKnockbackToEnemy(enemyId: string, newPos: { x: number; y?: number; z: number }, durationMs = KNOCKBACK_DURATION): void {
+    const instance = this.enemies.get(enemyId);
+    if (instance) {
+      instance.schema.position.x = newPos.x;
+      if (newPos.y !== undefined) instance.schema.position.y = newPos.y;
+      instance.schema.position.z = newPos.z;
+      instance.aiState.position.x = newPos.x;
+      instance.aiState.position.z = newPos.z;
+      instance.ai.applyKnockback(durationMs, this.room.state.elapsedTime);
+    }
   }
 
   getCurrentWave(): number {

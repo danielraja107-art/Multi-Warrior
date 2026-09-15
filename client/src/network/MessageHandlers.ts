@@ -15,6 +15,7 @@ interface ColyseusVector3 {
   x: number;
   y: number;
   z: number;
+  onChange?: (cb: () => void) => void;
 }
 
 interface ColyseusPlayer {
@@ -28,6 +29,7 @@ interface ColyseusPlayer {
   weapon: string;
   isHost: boolean;
   isAlive: boolean;
+  onChange?: (cb: () => void) => void;
 }
 
 interface ColyseusEnemy {
@@ -39,6 +41,7 @@ interface ColyseusEnemy {
   health: number;
   maxHealth: number;
   targetPlayerId: string;
+  onChange?: (cb: () => void) => void;
 }
 
 interface ColyseusBoss {
@@ -51,6 +54,7 @@ interface ColyseusBoss {
   currentAttack: string;
   isEnraged: boolean;
   isActive: boolean;
+  onChange?: (cb: () => void) => void;
 }
 
 interface ColyseusWeaponPickup {
@@ -58,6 +62,7 @@ interface ColyseusWeaponPickup {
   type: string;
   position: ColyseusVector3;
   isAvailable: boolean;
+  onChange?: (cb: () => void) => void;
 }
 
 interface ColyseusState {
@@ -130,44 +135,99 @@ export function attachRoom(room: Room<any>, localSessionId: string) {
   const state = room.state as unknown as ColyseusState;
   applyFullSync(state);
 
+  const bindPlayer = (player: ColyseusPlayer) => {
+    const sync = () => {
+      useGameStore.getState().upsertPlayer(toClientPlayer(player));
+    };
+    sync();
+    if (typeof player.onChange === 'function') player.onChange(sync);
+    if (typeof player.position?.onChange === 'function') player.position.onChange(sync);
+    if (typeof player.rotation?.onChange === 'function') player.rotation.onChange(sync);
+  };
+
   const players = state.players as unknown as {
+    forEach: (cb: (v: ColyseusPlayer, k: string) => void) => void;
     onAdd: (cb: (v: ColyseusPlayer, k: string) => void) => void;
     onRemove: (cb: (v: ColyseusPlayer, k: string) => void) => void;
-    onClear: (cb: () => void) => void;
+    onClear?: (cb: () => void) => void;
   };
   players.onAdd((player: ColyseusPlayer) => {
-    useGameStore.getState().upsertPlayer(toClientPlayer(player));
+    bindPlayer(player);
   });
   players.onRemove((player: ColyseusPlayer) => {
     useGameStore.getState().removePlayer(player.sessionId);
   });
-  players.onClear(() => useGameStore.getState().clearPlayers());
+  if (typeof players.onClear === 'function') players.onClear(() => useGameStore.getState().clearPlayers());
+  if (typeof players.forEach === 'function') {
+    players.forEach((p) => bindPlayer(p));
+  }
+
+  const bindEnemy = (enemy: ColyseusEnemy) => {
+    const sync = () => {
+      useGameStore.getState().upsertEnemy(toClientEnemy(enemy));
+    };
+    sync();
+    if (typeof enemy.onChange === 'function') enemy.onChange(sync);
+    if (typeof enemy.position?.onChange === 'function') enemy.position.onChange(sync);
+    if (typeof enemy.rotation?.onChange === 'function') enemy.rotation.onChange(sync);
+  };
 
   const enemies = state.enemies as unknown as {
+    forEach: (cb: (v: ColyseusEnemy, k: string) => void) => void;
     onAdd: (cb: (v: ColyseusEnemy, k: string) => void) => void;
     onRemove: (cb: (v: ColyseusEnemy, k: string) => void) => void;
-    onClear: (cb: () => void) => void;
+    onClear?: (cb: () => void) => void;
   };
   enemies.onAdd((enemy: ColyseusEnemy) => {
-    useGameStore.getState().upsertEnemy(toClientEnemy(enemy));
+    bindEnemy(enemy);
   });
   enemies.onRemove((enemy: ColyseusEnemy) => {
     useGameStore.getState().removeEnemy(enemy.id);
   });
-  enemies.onClear(() => useGameStore.getState().clearEnemies());
+  if (typeof enemies.onClear === 'function') enemies.onClear(() => useGameStore.getState().clearEnemies());
+  if (typeof enemies.forEach === 'function') {
+    enemies.forEach((e) => bindEnemy(e));
+  }
+
+  const bindWeaponPickup = (w: ColyseusWeaponPickup) => {
+    const sync = () => {
+      useGameStore.getState().upsertWeaponPickup(toClientWeaponPickup(w));
+    };
+    sync();
+    if (typeof w.onChange === 'function') w.onChange(sync);
+    if (typeof w.position?.onChange === 'function') w.position.onChange(sync);
+  };
 
   const weaponPickups = state.weaponPickups as unknown as {
+    forEach: (cb: (v: ColyseusWeaponPickup, k: string) => void) => void;
     onAdd: (cb: (v: ColyseusWeaponPickup, k: string) => void) => void;
     onRemove: (cb: (v: ColyseusWeaponPickup, k: string) => void) => void;
-    onClear: (cb: () => void) => void;
+    onClear?: (cb: () => void) => void;
   };
   weaponPickups.onAdd((w: ColyseusWeaponPickup) => {
-    useGameStore.getState().upsertWeaponPickup(toClientWeaponPickup(w));
+    bindWeaponPickup(w);
   });
   weaponPickups.onRemove((w: ColyseusWeaponPickup) => {
     useGameStore.getState().removeWeaponPickup(w.id);
   });
-  weaponPickups.onClear(() => useGameStore.getState().clearWeaponPickups());
+  if (typeof weaponPickups.onClear === 'function') weaponPickups.onClear(() => useGameStore.getState().clearWeaponPickups());
+  if (typeof weaponPickups.forEach === 'function') {
+    weaponPickups.forEach((w) => bindWeaponPickup(w));
+  }
+
+  if (state.boss) {
+    const syncBoss = () => {
+      useGameStore.getState().setBoss(toClientBoss(state.boss!));
+    };
+    syncBoss();
+    if (typeof state.boss.onChange === 'function') state.boss.onChange(syncBoss);
+    if (typeof state.boss.position?.onChange === 'function') state.boss.position.onChange(syncBoss);
+    if (typeof state.boss.rotation?.onChange === 'function') state.boss.rotation.onChange(syncBoss);
+  }
+
+  room.onStateChange((latestState) => {
+    bindMeta(latestState as ColyseusState);
+  });
 
   room.onMessage(MESSAGE_SERVER.STATE_UPDATE, () => {
     applyFullSync(room.state as unknown as ColyseusState);

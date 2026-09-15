@@ -78,6 +78,7 @@ export class WaveDirector {
     this.currentWave = 0;
     this.room.state.maxWaves = this.maxWaves;
     this.room.state.difficulty = difficulty;
+    this.enemySystem.setWave(1, difficulty);
   }
 
   startNextWave(): void {
@@ -95,6 +96,7 @@ export class WaveDirector {
     const config = this.waveConfigs.get(this.currentWave);
     if (!config) return;
 
+    this.enemySystem.setWave(this.currentWave, this.difficulty);
     this.room.state.currentWave = this.currentWave;
     this.room.state.phase = 'game';
     this.room.state.enemiesRemaining = 0;

@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
+import { Canvas } from '@react-three/fiber';
 import { useShallow } from 'zustand/react/shallow';
 import { PhysicsWorld } from './physics/PhysicsWorld';
 import { LocalPlayer } from './players/LocalPlayer';
@@ -15,6 +16,7 @@ import { ScreenShake } from './effects/ScreenShake';
 import { FPSMonitorBridge } from './debug/FPSMonitor';
 import { PerformanceMonitor } from '../debug/PerformanceMonitor';
 import { useGameStore, type ClientPlayerState } from '../state/GameStore';
+import { initInput, clearInput } from './Input';
 
 const RemotePlayers = memo(function RemotePlayers() {
   const remoteSessionIds = useGameStore(
@@ -35,7 +37,7 @@ const RemotePlayers = memo(function RemotePlayers() {
   );
 });
 
-export function GameScene() {
+function GameSceneContent() {
   const localSessionId = useGameStore((s) => s.localSessionId);
   const localPlayer = useGameStore((s) => {
     if (!s.localSessionId) return null;
@@ -85,5 +87,26 @@ export function GameScene() {
       <FPSMonitorBridge />
       <PerformanceMonitor />
     </>
+  );
+}
+
+export function GameScene() {
+  useEffect(() => {
+    initInput();
+    return () => {
+      clearInput();
+    };
+  }, []);
+
+  return (
+    <div id="game-canvas-container" className="absolute inset-0 w-full h-full z-0 overflow-hidden">
+      <Canvas
+        shadows
+        dpr={[1, 2]}
+        camera={{ fov: 45, near: 0.1, far: 400, position: [0, 16, 24] }}
+      >
+        <GameSceneContent />
+      </Canvas>
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import { Client } from 'colyseus.js';
 import { matchMaker } from 'colyseus';
-import { GameRoom } from '../src/rooms/GameRoom.js';
+import { GameRoom } from '../src/rooms/GameRoom';
 import {
   RoomPhase,
   BossPhase,

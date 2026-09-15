@@ -2,6 +2,7 @@ import { Room } from 'colyseus';
 import { GameState, WeaponType, WeaponProfile } from '@storm-arena/shared';
 import { getWeaponStats } from '@storm-arena/shared';
 import { MOVEMENT_BOUNDARY } from '../movement/MovementSystem';
+import { EnemySystem } from '../enemies/EnemySystem';
 
 export interface RockProjectile {
   id: string;
@@ -21,9 +22,14 @@ const TICK_INTERVAL_MS = 50;
 export class RockProjectileSystem {
   private room: Room<GameState>;
   private projectiles: Map<string, RockProjectile> = new Map();
+  private enemySystem?: EnemySystem;
 
   constructor(room: Room<GameState>) {
     this.room = room;
+  }
+
+  setEnemySystem(enemySystem: EnemySystem): void {
+    this.enemySystem = enemySystem;
   }
 
   throwRock(ownerId: string, direction: { x: number; y: number; z: number }, startPos: { x: number; y: number; z: number }): void {
@@ -105,16 +111,21 @@ export class RockProjectileSystem {
   }
 
   private applyDamage(enemy: any, proj: RockProjectile): void {
-    enemy.health = Math.max(0, enemy.health - proj.damage);
-    if (enemy.health <= 0) {
-      enemy.state = 'dead';
-      this.room.state.enemiesRemaining = Math.max(0, this.room.state.enemiesRemaining - 1);
+    if (!this.enemySystem) return;
+
+    const killed = this.enemySystem.applyDamage(
+      enemy.id,
+      proj.damage,
+      proj.position,
+      false
+    );
+
+    if (killed) {
       this.room.broadcast('GAME_EVENT', {
         event: 'player_killed',
         data: { enemyId: enemy.id, damage: proj.damage, projectile: true },
       });
     } else {
-      enemy.state = 'stagger';
       this.room.broadcast('GAME_EVENT', {
         event: 'player_killed',
         data: { enemyId: enemy.id, damage: proj.damage, health: enemy.health },

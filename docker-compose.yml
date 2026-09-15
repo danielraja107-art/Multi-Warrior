@@ -17,8 +17,23 @@ services:
       timeout: 5s
       retries: 10
 
-  # Optional accelerated database for local convenience:
-  # pgadmin:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: storm-arena-server
+    restart: unless-stopped
+    ports:
+      - '2567:2567'
+    environment:
+      PORT: 2567
+      NODE_ENV: production
+      DATABASE_URL: postgresql://stormarena:stormarena@db:5432/stormarena?schema=public
+      JWT_SECRET: dev-secret-change-me
+      CORS_ORIGIN: '*'
+    depends_on:
+      db:
+        condition: service_healthy
   #   image: dpage/pgadmin4
   #   environment:
   #     PGADMIN_DEFAULT_EMAIL: admin@stormarena.test

@@ -146,15 +146,22 @@ async function main() {
   );
 
   const localIdBefore = fresh().localPlayerId!;
-  const posAtDisconnect = serverPosition(serverRoom(gameRoom.roomId)!, localIdBefore);
-  check(posAtDisconnect !== null && posAtDisconnect.x > -3, '2: local player position advanced');
+
+  // Stop moving so velocity is zero before disconnect
+  (getCurrentRoom() as any).send('PLAYER_MOVE', {
+    direction: { x: 0, y: 0, z: 0 },
+    timestamp: Date.now(),
+  });
+  await sleep(100);
 
   (getCurrentRoom() as any).connection.close(4001);
-  await sleep(200);
   await until(
     () => fresh().connection.status === ConnectionStatus.RECONNECTING,
     '2: disconnect during game enters reconnecting state',
   );
+
+  const posAtDisconnect = serverPosition(serverRoom(gameRoom.roomId)!, localIdBefore);
+  check(posAtDisconnect !== null && posAtDisconnect.x > -3, '2: local player position advanced');
   check(
     serverRoom(gameRoom.roomId)!.state.players.size === 2,
     '2: player slot kept during the reconnection window',

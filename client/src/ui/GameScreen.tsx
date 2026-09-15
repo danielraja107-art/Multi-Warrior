@@ -8,6 +8,7 @@ import { WaveTransition } from './WaveTransition'
 import { LoadingSpinner } from './components/LoadingSpinner'
 import { ConnectionStatus as ConnectionStatusBadge } from './components/ConnectionStatus'
 import { reconnect } from '../network/socket'
+import { GameScene } from '../game/GameScene'
 
 export function GameScreen() {
   const navigate = useNavigate()
@@ -59,8 +60,8 @@ export function GameScreen() {
 
   return (
     <div className="relative w-full h-full w-screen h-screen overflow-hidden bg-storm-950 select-none">
-      {/* Phase 21: Member 2's 3D canvas mounts here via id selector */}
-      <div id="game-canvas-container" className="absolute inset-0 w-full h-full z-0 overflow-hidden" />
+      {/* 3D Arena Scene */}
+      <GameScene />
 
       {/* UI overlay — pointer-events-none so clicks reach the 3D canvas;
           interactive elements inside re-enable pointer-events as needed */}

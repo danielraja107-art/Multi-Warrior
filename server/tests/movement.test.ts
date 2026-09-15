@@ -1,7 +1,7 @@
 import { Server } from 'colyseus';
 import { Client } from 'colyseus.js';
-import { GameRoom } from '../src/rooms/GameRoom.js';
-import { MovementSystem, PLAYER_SPEED } from '../src/gameplay/movement/MovementSystem.js';
+import { GameRoom } from '../src/rooms/GameRoom';
+import { MovementSystem, PLAYER_SPEED } from '../src/gameplay/movement/MovementSystem';
 
 const PORT = 2569;
 let failures: string[] = [];

@@ -3,8 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import { Server } from 'colyseus';
 import { Client } from 'colyseus.js';
-import { GameRoom } from '../src/rooms/GameRoom.js';
-import { gameRoomRouter } from '../src/api/GameRoomRouter.js';
+import { GameRoom } from '../src/rooms/GameRoom';
+import { gameRoomRouter } from '../src/api/GameRoomRouter';
 import { RoomPhase } from '@storm-arena/shared';
 import {
   createRoom,

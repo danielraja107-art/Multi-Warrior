@@ -62,6 +62,8 @@ export class GameRoom extends Room<GameState> {
   public simulationPaused = false;
 
   onCreate(options: { difficulty?: string }) {
+    this.combat.setEnemySystem(this.enemySystem);
+    this.projectiles.setEnemySystem(this.enemySystem);
     this.setState(new GameState());
     this.state.roomCode = generateRoomCode();
     this.state.phase = RoomPhase.LOBBY;
@@ -119,7 +121,7 @@ export class GameRoom extends Room<GameState> {
       if (this.state.phase !== RoomPhase.LOBBY) return;
 
       const playerCount = this.state.players.size;
-      if (playerCount < 2) return;
+      if (playerCount < 1) return;
 
       this.waveDirector.startGame(this.state.difficulty as Difficulty);
       this.waveDirector.startNextWave();

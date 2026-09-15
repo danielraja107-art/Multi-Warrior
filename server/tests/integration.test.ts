@@ -1,6 +1,6 @@
 import { Server } from 'colyseus';
 import { Client } from 'colyseus.js';
-import { GameRoom } from '../src/rooms/GameRoom.js';
+import { GameRoom } from '../src/rooms/GameRoom';
 
 const PORT = 2568;
 let failures: string[] = [];

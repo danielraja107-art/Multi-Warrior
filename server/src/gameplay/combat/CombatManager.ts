@@ -47,8 +47,11 @@ function recordEntityPositions(history: PositionHistory, entities: Map<string, {
   });
 }
 
+import { EnemySystem } from '../enemies/EnemySystem';
+
 export class CombatManager {
   private room: Room<GameState>;
+  private enemySystem?: EnemySystem;
   private positionHistory: PositionHistory;
   private hitboxSystem: HitboxSystem;
   private damageSystem: DamageSystem;
@@ -60,14 +63,19 @@ export class CombatManager {
   private playerBlockStates: Map<string, boolean> = new Map();
   private currentTick = 0;
 
-  constructor(room: Room<GameState>) {
+  constructor(room: Room<GameState>, enemySystem?: EnemySystem) {
     this.room = room;
+    this.enemySystem = enemySystem;
     this.positionHistory = new PositionHistory();
     this.hitboxSystem = new HitboxSystem(this.positionHistory);
     this.damageSystem = new DamageSystem();
     this.knockbackSystem = new KnockbackSystem();
 
     this.registerMessageHandlers();
+  }
+
+  public setEnemySystem(enemySystem: EnemySystem): void {
+    this.enemySystem = enemySystem;
   }
 
   private registerMessageHandlers(): void {
@@ -219,6 +227,9 @@ export class CombatManager {
         enemy.health = dmgResult.newHealth;
         if (dmgResult.stateChange) {
           enemy.state = dmgResult.stateChange;
+          if (dmgResult.stateChange === EnemyState.STAGGER) {
+            this.enemySystem?.applyStagger(enemy.id);
+          }
         }
 
         const kbResult = this.knockbackSystem.applyKnockback(
@@ -230,6 +241,7 @@ export class CombatManager {
 
         enemy.position.x = kbResult.position.x;
         enemy.position.z = kbResult.position.z;
+        this.enemySystem?.applyKnockbackToEnemy(enemy.id, kbResult.position);
 
         const nearbyEnemies = Array.from(enemyMap.values())
           .filter(e => e.id !== enemy.id && e.state !== EnemyState.DEAD)
@@ -247,6 +259,7 @@ export class CombatManager {
           if (chainEnemy) {
             chainEnemy.position.x = chain.position.x;
             chainEnemy.position.z = chain.position.z;
+            this.enemySystem?.applyKnockbackToEnemy(chain.id, chain.position);
           }
         }
 

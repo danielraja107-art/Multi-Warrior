@@ -2,7 +2,7 @@ import http from 'http';
 import express from 'express';
 import cors from 'cors';
 import { Server } from 'colyseus';
-import { gameRoomRouter } from '../src/api/GameRoomRouter.js';
+import { gameRoomRouter } from '../src/api/GameRoomRouter';
 import { useGameStore } from '../../client/src/state/useGameStore';
 
 export let failures: string[] = [];

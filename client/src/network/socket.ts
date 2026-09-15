@@ -14,6 +14,8 @@ import {
 } from '@storm-arena/shared'
 import { useGameStore } from '../state/useGameStore'
 import { reportError } from './telemetry'
+import { setActiveRoom } from './commands'
+import { attachRoom, detachRoom } from './MessageHandlers'
 
 export type RoomErrorCode =
   | 'ROOM_NOT_FOUND'
@@ -336,6 +338,8 @@ function clearSession() {
 
 function bindRoom(room: Room<any>) {
   currentRoom = room
+  setActiveRoom(room)
+  attachRoom(room, room.sessionId)
   const store = useGameStore.getState()
   store.setConnection({
     status: ConnectionStatus.CONNECTED,
@@ -369,6 +373,8 @@ function bindRoom(room: Room<any>) {
   })
 
   room.onLeave((code) => {
+    setActiveRoom(null)
+    detachRoom()
     const store = useGameStore.getState()
     const hadLiveSession =
       Boolean(store.connection.roomId) && store.localPlayerId != null && store.localPlayerId === room.sessionId
@@ -559,6 +565,8 @@ export async function joinRoom(code: string): Promise<Room<any>> {
 export async function leaveRoom(): Promise<void> {
   const room = currentRoom
   currentRoom = null
+  setActiveRoom(null)
+  detachRoom()
   clearSession()
   const store = useGameStore.getState()
   store.setConnection({ status: ConnectionStatus.DISCONNECTED, roomId: null })

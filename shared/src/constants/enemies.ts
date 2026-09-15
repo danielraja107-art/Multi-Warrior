@@ -90,11 +90,13 @@ export function getEnemyStats(type: EnemyType): EnemyStats {
 }
 
 export function getScaledHealth(baseHealth: number, wave: number, difficultyMultiplier: number): number {
-  const waveScaling = 1 + (wave - 1) * 0.15;
+  const effectiveWave = Math.max(1, wave);
+  const waveScaling = 1 + (effectiveWave - 1) * 0.15;
   return Math.round(baseHealth * waveScaling * difficultyMultiplier);
 }
 
 export function getScaledDamage(baseDamage: number, wave: number, difficultyMultiplier: number): number {
-  const waveScaling = 1 + (wave - 1) * 0.1;
+  const effectiveWave = Math.max(1, wave);
+  const waveScaling = 1 + (effectiveWave - 1) * 0.1;
   return Math.round(baseDamage * waveScaling * difficultyMultiplier);
 }

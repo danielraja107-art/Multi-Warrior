@@ -44,8 +44,8 @@ export interface EnemyAIState {
 }
 
 const VALID_TRANSITIONS: Record<AIState, AIState[]> = {
-  IDLE: ['DETECT', 'DEAD'],
-  DETECT: ['IDLE', 'CHASE', 'DEAD'],
+  IDLE: ['DETECT', 'STAGGER', 'KNOCKBACK', 'DEAD'],
+  DETECT: ['IDLE', 'CHASE', 'STAGGER', 'KNOCKBACK', 'DEAD'],
   CHASE: ['DETECT', 'ATTACK', 'STAGGER', 'KNOCKBACK', 'DEAD'],
   ATTACK: ['CHASE', 'RECOVER', 'STAGGER', 'KNOCKBACK', 'DEAD'],
   RECOVER: ['CHASE', 'DETECT', 'STAGGER', 'KNOCKBACK', 'DEAD'],
@@ -82,18 +82,23 @@ export class EnemyAI {
     }
 
     if (this.currentState === 'STAGGER' && currentTime >= this.staggerEndTime) {
-      this.setState('RECOVER');
+      this.applyRecover(800, currentTime);
+      return;
     }
     if (this.currentState === 'KNOCKBACK' && currentTime >= this.knockbackEndTime) {
-      this.setState('RECOVER');
+      this.applyRecover(800, currentTime);
+      return;
     }
     if (this.currentState === 'RECOVER' && currentTime >= this.recoverEndTime) {
       this.setState('CHASE');
     }
 
-    const target = players.get(enemy.targetPlayerId);
+    let target = enemy.targetPlayerId ? players.get(enemy.targetPlayerId) : undefined;
+    if (!target && players.size > 0) {
+      target = players.values().next().value;
+    }
     const hasTarget = !!target;
-    const distanceToTarget = hasTarget
+    const distanceToTarget = target
       ? Math.sqrt(
           (target.position.x - enemy.position.x) ** 2 +
           (target.position.z - enemy.position.z) ** 2
@@ -154,10 +159,9 @@ export class EnemyAI {
   }
 
   applyRecover(duration: number, currentTime: number): void {
+    if (this.currentState === 'DEAD') return;
     this.recoverEndTime = currentTime + duration;
-    if (this.currentState === 'RECOVER') {
-      this.setState('RECOVER');
-    }
+    this.setState('RECOVER');
   }
 
   canAttack(currentTime: number, cooldown: number): boolean {
