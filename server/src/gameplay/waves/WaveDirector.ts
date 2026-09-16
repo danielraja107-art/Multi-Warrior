@@ -165,7 +165,6 @@ export class WaveDirector {
   }
 
   onEnemyDeath(): void {
-    this.room.state.enemiesRemaining = Math.max(0, this.room.state.enemiesRemaining - 1);
     this.checkWaveComplete();
   }
 

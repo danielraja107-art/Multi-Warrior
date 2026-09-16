@@ -426,28 +426,7 @@ export class BossAI {
   }
 
   private updatePhase(): void {
-    if (this.phaseTransitionPending) return;
-
-    const hpPct = this.boss.health / Math.max(1, this.boss.maxHealth);
-
-    if (hpPct <= 0.2 && this.boss.phase !== BossPhase.ENRAGED) {
-      this.boss.isEnraged = true;
-      this.boss.phase = BossPhase.ENRAGED;
-      this.triggerPhaseTransition();
-      return;
-    }
-
-    if (hpPct <= 0.5 && this.boss.phase === BossPhase.PHASE_1) {
-      this.boss.phase = BossPhase.PHASE_3;
-      this.triggerPhaseTransition();
-      return;
-    }
-
-    if (hpPct <= 0.75 && this.boss.phase === BossPhase.PHASE_1) {
-      this.boss.phase = BossPhase.PHASE_2;
-      this.triggerPhaseTransition();
-      return;
-    }
+    // Phase transitions are handled by BossSystem.syncPhaseFromHealth()
   }
 
   private triggerPhaseTransition(): void {
