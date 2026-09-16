@@ -100,11 +100,13 @@ export enum GameEvent {
   MATCH_END = 'match_end',
 }
 
-export interface Vector3Data {
+export interface Vec3 {
   x: number;
   y: number;
   z: number;
 }
+
+export type Vector3Data = Vec3;
 
 export interface PlayerData {
   id: string;

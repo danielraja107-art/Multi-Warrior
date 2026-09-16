@@ -20,6 +20,7 @@ export class Vector3 extends Schema {
 export class Player extends Schema {
   @type('string') id: string = '';
   @type('string') sessionId: string = '';
+  @type('string') userId: string = '';
   @type('string') color: string = PlayerColor.RED;
   @type(Vector3) position: Vector3 = new Vector3();
   @type(Vector3) rotation: Vector3 = new Vector3();

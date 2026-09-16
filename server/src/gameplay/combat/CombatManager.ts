@@ -8,7 +8,6 @@ import {
   AttackType,
   EnemyState,
   GameEvent,
-  MESSAGE_CLIENT,
   MESSAGE_SERVER,
 } from '@storm-arena/shared';
 import { PositionHistory } from '../../lag/PositionHistory';
@@ -71,22 +70,10 @@ export class CombatManager {
     this.hitboxSystem = new HitboxSystem(this.positionHistory);
     this.damageSystem = new DamageSystem();
     this.knockbackSystem = new KnockbackSystem();
-
-    this.registerMessageHandlers();
   }
 
   public setEnemySystem(enemySystem: EnemySystem): void {
     this.enemySystem = enemySystem;
-  }
-
-  private registerMessageHandlers(): void {
-    this.room.onMessage(MESSAGE_CLIENT.PLAYER_DODGE, (client, payload) => {
-      this.handleDodge(client, payload);
-    });
-
-    this.room.onMessage(MESSAGE_CLIENT.PLAYER_BLOCK, (client, payload) => {
-      this.handleBlock(client, payload);
-    });
   }
 
   public handleAttack(client: Client, payload: { type: AttackType; weapon: WeaponType; timestamp: number | bigint }): void {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { GameState, Player, RoomPhase, BossPhase, Difficulty } from '@storm-arena/shared';
-import { BossSystem } from '../src/gameplay/bosses/BossSystem';
+import { BossController } from '../src/gameplay/bosses/BossController';
 
 function createRoom() {
   const state = new GameState();
@@ -18,25 +18,28 @@ function createRoom() {
 }
 
 const room = createRoom();
-const bossSystem = new BossSystem(room);
+const bossController = new BossController(room);
 
-bossSystem.spawnBoss(2);
+bossController.spawnBoss(2);
 assert.equal(room.state.boss.isActive, true, 'boss should activate on spawn');
 assert.equal(room.state.boss.phase, BossPhase.PHASE_1, 'boss starts in phase 1');
 assert.ok(room.state.boss.maxHealth > 0, 'boss max health should scale with players');
 
-bossSystem.applyDamage(room.state.boss.maxHealth * 0.25);
+room.state.boss.health = room.state.boss.maxHealth * 0.75;
+bossController.syncPhaseFromHealth();
 assert.equal(room.state.boss.phase, BossPhase.PHASE_2, 'boss transitions to phase 2 at 75% remaining');
 
-bossSystem.applyDamage(room.state.boss.maxHealth * 0.25);
+room.state.boss.health = room.state.boss.maxHealth * 0.50;
+bossController.syncPhaseFromHealth();
 assert.equal(room.state.boss.phase, BossPhase.PHASE_3, 'boss transitions to phase 3 at 50% remaining');
 
-bossSystem.applyDamage(room.state.boss.maxHealth * 0.31);
+room.state.boss.health = room.state.boss.maxHealth * 0.19;
+bossController.syncPhaseFromHealth();
 assert.equal(room.state.boss.phase, BossPhase.ENRAGED, 'boss enters enraged state below 20% life');
 assert.equal(room.state.boss.isEnraged, true, 'enraged flag is set');
 
-const defeated = bossSystem.applyDamage(room.state.boss.health);
-assert.equal(defeated, true, 'boss should be defeated when health reaches zero');
+const defeated = bossController.defeatBoss();
+assert.equal(defeated, true, 'boss should be defeated when defeatBoss is called');
 assert.equal(room.state.phase, RoomPhase.VICTORY, 'victory phase should be set after boss defeat');
 
 console.log('BOSS SYSTEM: PASS');

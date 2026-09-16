@@ -1,11 +1,5 @@
-import { EnemyState, WeaponType, AttackType, GameEvent } from '@storm-arena/shared';
+import { EnemyState, WeaponType, AttackType, GameEvent, Vec3 } from '@storm-arena/shared';
 import { calculateDamage } from '@storm-arena/shared';
-
-export interface Vec3 {
-  x: number;
-  y: number;
-  z: number;
-}
 
 export interface DamageResult {
   enemyId: string;

@@ -1,12 +1,6 @@
-import { WeaponType, AttackType } from '@storm-arena/shared';
+import { WeaponType, AttackType, Vec3 } from '@storm-arena/shared';
 import { calculateKnockback } from '@storm-arena/shared';
 import { MOVEMENT_BOUNDARY } from '../movement/MovementSystem';
-
-export interface Vec3 {
-  x: number;
-  y: number;
-  z: number;
-}
 
 export interface KnockbackResult {
   position: Vec3;

@@ -1,5 +1,5 @@
 import { Room } from 'colyseus';
-import { GameState, WeaponType, WeaponProfile } from '@storm-arena/shared';
+import { GameState, Enemy, WeaponType } from '@storm-arena/shared';
 import { getWeaponStats } from '@storm-arena/shared';
 import { MOVEMENT_BOUNDARY } from '../movement/MovementSystem';
 import { EnemySystem } from '../enemies/EnemySystem';
@@ -110,7 +110,7 @@ export class RockProjectileSystem {
     });
   }
 
-  private applyDamage(enemy: any, proj: RockProjectile): void {
+  private applyDamage(enemy: Enemy, proj: RockProjectile): void {
     if (!this.enemySystem) return;
 
     const killed = this.enemySystem.applyDamage(

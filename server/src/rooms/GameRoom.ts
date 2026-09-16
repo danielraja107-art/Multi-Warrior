@@ -1,16 +1,13 @@
 import { Room, Client } from 'colyseus';
-import { GameState, Player, Enemy, Boss } from '@storm-arena/shared';
+import { GameState, Player, Enemy } from '@storm-arena/shared';
 import {
   RoomPhase,
   Difficulty,
   PlayerColor,
   PlayerState,
   WeaponType,
-  EnemyType,
-  EnemyState,
   GameEvent,
   AttackType,
-  BossPhase,
   MESSAGE_CLIENT,
   MESSAGE_SERVER,
 } from '@storm-arena/shared';
@@ -19,11 +16,11 @@ import { CombatManager } from '../gameplay/combat/CombatManager';
 import { WeaponSystem } from '../gameplay/weapons/WeaponSystem';
 import { RockProjectileSystem } from '../gameplay/weapons/RockProjectileSystem';
 import { WaveDirector } from '../gameplay/waves/WaveDirector';
-import { SpawnManager } from '../gameplay/waves/SpawnManager';
 import { EnemySystem } from '../gameplay/enemies/EnemySystem';
-import { BossSystem } from '../gameplay/bosses/BossSystem';
-import { BossAI } from '../boss/BossAI';
-import { CombatSystem } from '../boss/CombatSystem';
+import { BossController } from '../gameplay/bosses/BossController';
+import { verifyToken, TokenPayload } from '../auth/jwt';
+import { MatchService } from '../services/MatchService';
+import { logger } from '../util/logger';
 
 const PLAYER_COLORS: PlayerColor[] = [
   PlayerColor.RED,
@@ -52,14 +49,12 @@ export class GameRoom extends Room<GameState> {
   private weapons = new WeaponSystem(this);
   private projectiles = new RockProjectileSystem(this);
   private enemySystem = new EnemySystem(this);
-  private bossSystem = new BossSystem(this);
-  private spawnManager = new SpawnManager(this, this.enemySystem);
-  private waveDirector = new WaveDirector(this, this.enemySystem, this.weapons, this.bossSystem);
-  private bossAI: BossAI | null = null;
-  private bossCombat = new CombatSystem();
+  private bossController = new BossController(this);
+  private waveDirector = new WaveDirector(this, this.enemySystem, this.weapons, this.bossController);
   private bossSpawned = false;
   private bossDefeated = false;
   private victoryTimer: NodeJS.Timeout | null = null;
+  private matchService = new MatchService();
   public simulationPaused = false;
 
   onCreate(options: { difficulty?: string }) {
@@ -70,47 +65,76 @@ export class GameRoom extends Room<GameState> {
     this.state.roomCode = generateRoomCode();
     this.state.phase = RoomPhase.LOBBY;
     this.state.difficulty = options.difficulty ?? Difficulty.NORMAL;
-    this.state.maxWaves = 5;
+    this.state.maxWaves = 10;
     this.setMetadata({ code: this.state.roomCode });
 
     this.setSimulationInterval((deltaTime: number) => {
       this.serverTick(deltaTime);
     }, TICK_INTERVAL_MS);
 
+    this.registerMessageHandlers();
+  }
+
+  onAuth(client: Client, options: { token?: string }): TokenPayload | false {
+    if (process.env.NODE_ENV === 'production') {
+      if (!options.token) {
+        logger.warn('game-room', 'join rejected: no token', { sessionId: client.sessionId });
+        return false;
+      }
+      try {
+        return verifyToken(options.token);
+      } catch {
+        logger.warn('game-room', 'join rejected: invalid token', { sessionId: client.sessionId });
+        return false;
+      }
+    }
+    return { userId: `dev-${client.sessionId}`, username: 'dev-player' };
+  }
+
+  private registerMessageHandlers(): void {
     this.onMessage(MESSAGE_CLIENT.PLAYER_MOVE, (client, payload: MovementInput) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || !player.isAlive) return;
-
       const normalized = this.normalizeMoveInput(payload);
       if (!normalized) return;
-
       this.movement.enqueueInput(client.sessionId, normalized);
     });
 
     this.onMessage(MESSAGE_CLIENT.PLAYER_ATTACK, (client, payload) => {
       if (!this.validateAttackPayload(payload, client.sessionId)) return;
 
-      if (this.state.boss.isActive && this.bossAI) {
+      if (this.state.boss.isActive) {
         const player = this.state.players.get(client.sessionId);
         if (player && player.isAlive) {
-          const result = this.bossCombat.handlePlayerAttack(
-            player, payload.type, payload.weapon,
-            this.state.boss, this.bossAI, performance.now()
-          );
-          if (result) {
-            this.bossSystem.syncPhaseFromHealth();
-            if (result.isDead) {
+          const now = performance.now();
+          const dx = this.state.boss.position.x - player.position.x;
+          const dz = this.state.boss.position.z - player.position.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          const range = payload.type === 'heavy' ? 3.5 : 3.0;
+
+          if (dist <= range) {
+            const weaponDmg: Record<string, { light: number; heavy: number }> = {
+              fist: { light: 8, heavy: 15 }, stick: { light: 10, heavy: 18 },
+              baseball_bat: { light: 14, heavy: 24 }, axe: { light: 16, heavy: 28 },
+              hammer: { light: 12, heavy: 32 }, rock: { light: 6, heavy: 10 },
+            };
+            const wd = weaponDmg[payload.weapon] ?? weaponDmg.fist;
+            const baseDamage = payload.type === 'heavy' ? wd.heavy : wd.light;
+            const damage = Math.round(baseDamage * (0.9 + Math.random() * 0.2));
+
+            this.state.boss.health = Math.max(0, this.state.boss.health - damage);
+            this.bossController.syncPhaseFromHealth();
+
+            const knockbackX = dx / (dist || 1) * 2;
+            const knockbackZ = dz / (dist || 1) * 2;
+
+            if (this.state.boss.health <= 0) {
               this.handleBossDefeated();
             }
+
             this.broadcast('GAME_EVENT', {
               event: 'boss_damaged',
-              data: {
-                targetId: client.sessionId,
-                damage: result.damage,
-                isDead: result.isDead,
-                knockbackX: result.knockbackX,
-                knockbackZ: result.knockbackZ,
-              },
+              data: { targetId: client.sessionId, damage, isDead: this.state.boss.health <= 0, knockbackX, knockbackZ },
             });
           }
         }
@@ -148,9 +172,7 @@ export class GameRoom extends Room<GameState> {
       const player = this.state.players.get(client.sessionId);
       if (!player || !player.isHost) return;
       if (this.state.phase !== RoomPhase.LOBBY) return;
-
-      const playerCount = this.state.players.size;
-      if (playerCount < 1) return;
+      if (this.state.players.size < 1) return;
 
       this.waveDirector.startGame(this.state.difficulty as Difficulty);
       this.waveDirector.startNextWave();
@@ -165,11 +187,12 @@ export class GameRoom extends Room<GameState> {
       if (validDifficulties.includes(payload.difficulty)) {
         this.state.difficulty = payload.difficulty;
         this.waveDirector.setDifficulty(payload.difficulty as Difficulty);
+        this.bossController.setDifficulty(payload.difficulty);
       }
     });
   }
 
-  onJoin(client: Client) {
+  onJoin(client: Client, options: { token?: string }, auth?: TokenPayload) {
     const playerCount = this.state.players.size;
     const colorIndex = playerCount % PLAYER_COLORS.length;
     const color = PLAYER_COLORS[colorIndex];
@@ -177,6 +200,7 @@ export class GameRoom extends Room<GameState> {
     const player = new Player();
     player.id = client.sessionId;
     player.sessionId = client.sessionId;
+    player.userId = auth?.userId ?? `dev-${client.sessionId}`;
     player.color = color;
     player.health = 100;
     player.maxHealth = 100;
@@ -198,7 +222,7 @@ export class GameRoom extends Room<GameState> {
 
   onLeave(client: Client, consented: boolean) {
     const player = this.state.players.get(client.sessionId);
-    console.warn('[game-room]', 'player left', { sessionId: client.sessionId, consented, phase: this.state.phase });
+    logger.warn('game-room', 'player left', { sessionId: client.sessionId, consented, phase: this.state.phase });
     this.combat.onPlayerLeave(client.sessionId);
     this.weapons.onPlayerDeath(client.sessionId);
 
@@ -242,7 +266,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   onDispose() {
-    console.warn('[game-room]', 'room disposed', { roomCode: this.state.roomCode, players: this.state.players.size });
+    logger.warn('game-room', 'room disposed', { roomCode: this.state.roomCode, players: this.state.players.size });
     this.combat.dispose();
     this.state.players.clear();
     this.state.enemies.clear();
@@ -251,39 +275,29 @@ export class GameRoom extends Room<GameState> {
     this.weapons.clearAll();
     this.projectiles.clearAll();
     this.waveDirector.resetWave();
-    this.bossAI = null;
-    this.bossCombat.reset();
+    this.bossController.reset();
     if (this.victoryTimer) clearTimeout(this.victoryTimer);
   }
 
-  pause() {
-    this.simulationPaused = true;
-  }
-
-  unpause() {
-    this.simulationPaused = false;
-  }
+  pause() { this.simulationPaused = true; }
+  unpause() { this.simulationPaused = false; }
 
   resetForTest() {
     this.simulationPaused = true;
     this.enemySystem.clearAll();
-    this.bossSystem.update(0);
     this.state.boss.health = 0;
     this.state.boss.maxHealth = 0;
     this.state.boss.isActive = false;
     this.state.boss.isEnraged = false;
-    this.state.boss.phase = BossPhase.PHASE_1;
     this.bossSpawned = false;
     this.bossDefeated = false;
-    this.bossAI = null;
-    this.bossCombat.reset();
+    this.bossController.reset();
     this.waveDirector.resetWave();
     this.simulationPaused = false;
   }
 
   private normalizeMoveInput(input: MovementInput): MovementInput | null {
     if (!input || typeof input !== 'object') return null;
-
     const ts = Number(input.timestamp);
     if (!Number.isFinite(ts)) return null;
     if (!input.direction || typeof input.direction !== 'object') return null;
@@ -293,9 +307,7 @@ export class GameRoom extends Room<GameState> {
       typeof x !== 'number' || !Number.isFinite(x) ||
       typeof y !== 'number' || !Number.isFinite(y) ||
       typeof z !== 'number' || !Number.isFinite(z)
-    ) {
-      return null;
-    }
+    ) return null;
 
     const magnitude = Math.sqrt(x * x + y * y + z * z);
     if (magnitude > 1.01) return null;
@@ -331,35 +343,10 @@ export class GameRoom extends Room<GameState> {
     return speed > PLAYER_SPEED * 4.5;
   }
 
-  private startWave(waveNumber: number): void {
-    this.state.currentWave = waveNumber;
-
-    if (waveNumber === 5) {
-      this.spawnBoss();
-      return;
-    }
-
-    this.broadcast('GAME_EVENT', {
-      event: GameEvent.WAVE_START,
-      data: { wave: waveNumber },
-    });
-  }
-
   private spawnBoss(): void {
     if (this.bossSpawned) return;
     this.bossSpawned = true;
-
-    this.bossAI = new BossAI(this.state.boss, this.state.difficulty);
-    this.bossAI.spawn(this.state.players.size);
-
-    this.broadcast('GAME_EVENT', {
-      event: GameEvent.BOSS_SPAWN,
-      data: {
-        bossId: this.state.boss.id,
-        health: this.state.boss.health,
-        maxHealth: this.state.boss.maxHealth,
-      },
-    });
+    this.bossController.spawnBoss(this.state.players.size);
   }
 
   private handleBossDefeated(): void {
@@ -368,14 +355,9 @@ export class GameRoom extends Room<GameState> {
 
     this.state.boss.isActive = false;
 
-    const damageLog = this.bossCombat.resetDamageLog();
-
     this.broadcast('GAME_EVENT', {
       event: GameEvent.BOSS_DEFEATED,
-      data: {
-        bossId: this.state.boss.id,
-        damageLog: Object.fromEntries(damageLog),
-      },
+      data: { bossId: this.state.boss.id },
     });
 
     if (this.victoryTimer) clearTimeout(this.victoryTimer);
@@ -384,13 +366,41 @@ export class GameRoom extends Room<GameState> {
       this.state.phase = RoomPhase.VICTORY;
       this.broadcast('GAME_EVENT', {
         event: GameEvent.MATCH_END,
-        data: {
-          victory: true,
-          wave: this.state.currentWave,
-          elapsedTime: this.state.elapsedTime,
-        },
+        data: { victory: true, wave: this.state.currentWave, elapsedTime: this.state.elapsedTime },
       });
+      this.persistMatch(true);
     }, 3000);
+  }
+
+  private async persistMatch(victory: boolean): Promise<void> {
+    try {
+      const participants: Array<{ userId: string; color: string; kills: number; damage: number; deaths: number }> = [];
+      this.state.players.forEach((player) => {
+        participants.push({
+          userId: player.userId || player.sessionId,
+          color: player.color,
+          kills: 0,
+          damage: 0,
+          deaths: player.isAlive ? 0 : 1,
+        });
+      });
+
+      if (participants.length > 0) {
+        await this.matchService.persistMatch({
+          roomCode: this.state.roomCode,
+          arena: 'storm-arena',
+          difficulty: this.state.difficulty,
+          wavesCleared: this.state.currentWave,
+          bossDefeated: this.bossDefeated,
+          duration: Math.floor(this.state.elapsedTime / 1000),
+          victory,
+          participants,
+        });
+        logger.info('game-room', 'match persisted', { roomCode: this.state.roomCode, victory });
+      }
+    } catch (err) {
+      logger.error('game-room', 'failed to persist match', { error: String(err) });
+    }
   }
 
   private serverTick(deltaTime: number) {
@@ -434,40 +444,44 @@ export class GameRoom extends Room<GameState> {
     this.weapons.update?.(deltaTime);
     this.projectiles.update(deltaTime);
     this.enemySystem.update(deltaTime);
-    this.bossSystem.update(deltaTime);
+    this.enemySystem.updateProjectiles(deltaTime);
 
-    if (this.state.boss.isActive && this.bossAI) {
-      this.bossAI.tick(deltaTime, this.state.players);
+    if (this.state.boss.isActive) {
+      this.bossController.tick(deltaTime, this.state.players);
 
-      const bossResults = this.bossCombat.handleBossAttackPlayers(
-        this.state.boss,
-        this.bossAI,
-        this.state.players,
-        performance.now(),
-      );
+      const hitbox = this.bossController.getAttackHitbox();
+      if (hitbox) {
+        const cooldownKey = 'boss_aoe';
+        const now = performance.now();
+        const cooldown = this.state.boss.currentAttack === 'charge' ? 600 : 800;
 
-      for (const result of bossResults) {
-        const player = this.state.players.get(result.targetId);
-        if (player && result.isDead) {
-          player.isAlive = false;
-          player.state = PlayerState.DEAD;
-          player.health = 0;
+        this.state.players.forEach((player, id) => {
+          if (!player.isAlive) return;
+          const dx = player.position.x - hitbox.x;
+          const dz = player.position.z - hitbox.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist > hitbox.radius) return;
+
+          const damage = Math.round(hitbox.damage * (0.85 + Math.random() * 0.3));
+          player.health = Math.max(0, player.health - damage);
+
+          if (player.health <= 0) {
+            player.isAlive = false;
+            player.state = PlayerState.DEAD;
+            this.broadcast('GAME_EVENT', {
+              event: GameEvent.PLAYER_DIED,
+              data: { sessionId: id, killedBy: 'boss' },
+            });
+          }
 
           this.broadcast('GAME_EVENT', {
-            event: GameEvent.PLAYER_DIED,
-            data: { sessionId: result.targetId, killedBy: 'boss' },
+            event: 'player_damaged',
+            data: {
+              targetId: id, damage, isDead: player.health <= 0,
+              knockbackX: dist > 0.01 ? (dx / dist) * 3 : 0,
+              knockbackZ: dist > 0.01 ? (dz / dist) * 3 : 0,
+            },
           });
-        }
-
-        this.broadcast('GAME_EVENT', {
-          event: 'player_damaged',
-          data: {
-            targetId: result.targetId,
-            damage: result.damage,
-            isDead: result.isDead,
-            knockbackX: result.knockbackX,
-            knockbackZ: result.knockbackZ,
-          },
         });
       }
     }

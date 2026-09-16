@@ -12,11 +12,22 @@ export interface EnemyInstance {
   wave: number;
 }
 
+interface EnemyProjectile {
+  id: string;
+  enemyId: string;
+  position: { x: number; y: number; z: number };
+  velocity: { x: number; y: number; z: number };
+  spawnTime: number;
+  damage: number;
+}
+
 const ENEMY_SPAWN_RADIUS = 15;
 const TICK_INTERVAL_MS = 50;
 const STAGGER_DURATION = 500;
 const KNOCKBACK_DURATION = 300;
 const RECOVER_DURATION = 800;
+const RANGED_PROJECTILE_SPEED = 12;
+const RANGED_PROJECTILE_LIFETIME = 3000;
 
 function aiStateToEnemyState(aiState: string): EnemyState {
   switch (aiState) {
@@ -39,6 +50,7 @@ function enemyStateToString(enemyState: EnemyState): string {
 export class EnemySystem {
   private room: Room<GameState>;
   private enemies: Map<string, EnemyInstance> = new Map();
+  private projectiles: Map<string, EnemyProjectile> = new Map();
   private currentWave = 0;
   private difficulty = 'normal';
   private onEnemyDeathCallback: (() => void) | null = null;
@@ -247,21 +259,92 @@ export class EnemySystem {
       instance.aiState.lastAttackTime = currentTime;
       const damage = instance.aiState.damage;
 
-      target.health = Math.max(0, target.health - damage);
-      if (target.health <= 0) {
-        target.isAlive = false;
-        target.state = 'dead';
+      if (instance.schema.type === EnemyType.RANGED) {
+        this.fireRangedProjectile(instance, target, damage);
+      } else {
+        target.health = Math.max(0, target.health - damage);
+        if (target.health <= 0) {
+          target.isAlive = false;
+          target.state = 'dead';
+          this.room.broadcast('GAME_EVENT', {
+            event: 'player_died',
+            data: { sessionId: targetId },
+          });
+        }
+
         this.room.broadcast('GAME_EVENT', {
-          event: 'player_died',
-          data: { sessionId: targetId },
+          event: 'player_killed',
+          data: { sessionId: targetId, damage, health: target.health },
         });
       }
-
-      this.room.broadcast('GAME_EVENT', {
-        event: 'player_killed',
-        data: { sessionId: targetId, damage, health: target.health },
-      });
     }
+  }
+
+  private fireRangedProjectile(instance: EnemyInstance, target: Player, damage: number): void {
+    const dx = target.position.x - instance.schema.position.x;
+    const dz = target.position.z - instance.schema.position.z;
+    const dist = Math.sqrt(dx * dx + dz * dz) || 1;
+
+    const velocity = {
+      x: (dx / dist) * RANGED_PROJECTILE_SPEED,
+      y: 2,
+      z: (dz / dist) * RANGED_PROJECTILE_SPEED,
+    };
+
+    const projectile: EnemyProjectile = {
+      id: `proj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      enemyId: instance.schema.id,
+      position: { x: instance.schema.position.x, y: 1.5, z: instance.schema.position.z },
+      velocity,
+      spawnTime: Date.now(),
+      damage,
+    };
+
+    this.projectiles.set(projectile.id, projectile);
+  }
+
+  updateProjectiles(deltaTime: number): void {
+    const dt = deltaTime / 1000;
+    const now = Date.now();
+
+    this.projectiles.forEach((proj, id) => {
+      if (now - proj.spawnTime > RANGED_PROJECTILE_LIFETIME) {
+        this.projectiles.delete(id);
+        return;
+      }
+
+      proj.position.x += proj.velocity.x * dt;
+      proj.position.y += proj.velocity.y * dt;
+      proj.position.z += proj.velocity.z * dt;
+
+      this.room.state.players.forEach((player, playerId) => {
+        if (!player.isAlive) return;
+        const pdx = player.position.x - proj.position.x;
+        const pdz = player.position.z - proj.position.z;
+        const dist = Math.sqrt(pdx * pdx + pdz * pdz);
+
+        if (dist <= 1.5) {
+          player.health = Math.max(0, player.health - proj.damage);
+          if (player.health <= 0) {
+            player.isAlive = false;
+            player.state = 'dead';
+            this.room.broadcast('GAME_EVENT', {
+              event: 'player_died',
+              data: { sessionId: playerId, killedBy: proj.enemyId },
+            });
+          }
+          this.room.broadcast('GAME_EVENT', {
+            event: 'player_killed',
+            data: { sessionId: playerId, damage: proj.damage, health: player.health },
+          });
+          this.projectiles.delete(id);
+        }
+      });
+
+      if (proj.position.y < 0) {
+        this.projectiles.delete(id);
+      }
+    });
   }
 
   private syncAIStateToSchema(instance: EnemyInstance): void {

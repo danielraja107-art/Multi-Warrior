@@ -121,9 +121,28 @@ async function main() {
 
   gameServer.define('game_room', GameRoom);
 
-  httpServer.listen(config.port, () => {
+  const runningServer = httpServer.listen(config.port, () => {
     logger.info('startup', `Storm Arena server listening on http://localhost:${config.port}`);
   });
+
+  const shutdown = async (signal: string) => {
+    logger.info('shutdown', `${signal} received. Shutting down gracefully...`);
+    runningServer.close(() => {
+      logger.info('shutdown', 'HTTP server closed.');
+      prisma.$disconnect().then(() => {
+        logger.info('shutdown', 'Database disconnected.');
+        process.exit(0);
+      });
+    });
+
+    setTimeout(() => {
+      logger.error('shutdown', 'Forced shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 main().catch((err) => {

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from './ApiError';
 import { config } from '../config';
+import { logger } from './logger';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -89,7 +90,7 @@ export function errorHandler(
     }
   }
 
-  console.error('[unhandled-error]', err);
+  logger.error('validation', 'unhandled error', { error: err instanceof Error ? err.message : String(err) });
   const message =
     config.nodeEnv === 'production'
       ? 'Internal server error.'

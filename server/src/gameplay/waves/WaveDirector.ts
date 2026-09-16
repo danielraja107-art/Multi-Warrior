@@ -1,10 +1,12 @@
 import { Room } from 'colyseus';
-import { GameState, Difficulty, EnemyType, EnemyState, GameEvent } from '@storm-arena/shared';
-import { getEnemyStats } from '@storm-arena/shared';
-import { MOVEMENT_BOUNDARY } from '../movement/MovementSystem';
+import { GameState, Difficulty, EnemyType, GameEvent } from '@storm-arena/shared';
 import { EnemySystem } from '../enemies/EnemySystem';
 import { WeaponSystem } from '../weapons/WeaponSystem';
-import { BossSystem } from '../bosses/BossSystem';
+import { BossController } from '../bosses/BossController';
+
+interface RoomWithPause {
+  simulationPaused: boolean;
+}
 
 export interface WaveConfig {
   wave: number;
@@ -18,58 +20,63 @@ export class WaveDirector {
   private room: Room<GameState>;
   private enemySystem: EnemySystem;
   private weaponSystem: WeaponSystem;
-  private bossSystem: BossSystem;
+  private bossController: BossController;
   private currentWave = 0;
-  private maxWaves = 5;
+  private maxWaves = 10;
   private difficulty: Difficulty = Difficulty.NORMAL;
   private isResting = false;
   private restTimer: NodeJS.Timeout | null = null;
   private waveConfigs: Map<number, WaveConfig> = new Map();
   private activeSpawnTimers: NodeJS.Timeout[] = [];
 
-  constructor(room: Room<GameState>, enemySystem: EnemySystem, weaponSystem: WeaponSystem, bossSystem?: BossSystem) {
+  constructor(room: Room<GameState>, enemySystem: EnemySystem, weaponSystem: WeaponSystem, bossController?: BossController) {
     this.room = room;
     this.enemySystem = enemySystem;
     this.weaponSystem = weaponSystem;
-    this.bossSystem = bossSystem ?? new BossSystem(room);
+    this.bossController = bossController ?? new BossController(room);
     this.initializeWaveConfigs();
   }
 
   private initializeWaveConfigs(): void {
     this.waveConfigs.set(1, {
-      wave: 1,
-      enemyBudget: 3,
-      enemyTypes: [EnemyType.BASIC],
-      spawnIntervalMs: 1000,
-      isBossWave: false,
+      wave: 1, enemyBudget: 3,
+      enemyTypes: [EnemyType.BASIC], spawnIntervalMs: 1000, isBossWave: false,
     });
     this.waveConfigs.set(2, {
-      wave: 2,
-      enemyBudget: 5,
-      enemyTypes: [EnemyType.BASIC, EnemyType.FAST],
-      spawnIntervalMs: 1200,
-      isBossWave: false,
+      wave: 2, enemyBudget: 5,
+      enemyTypes: [EnemyType.BASIC, EnemyType.FAST], spawnIntervalMs: 1200, isBossWave: false,
     });
     this.waveConfigs.set(3, {
-      wave: 3,
-      enemyBudget: 7,
-      enemyTypes: [EnemyType.BASIC, EnemyType.FAST, EnemyType.HEAVY],
-      spawnIntervalMs: 1000,
-      isBossWave: false,
+      wave: 3, enemyBudget: 7,
+      enemyTypes: [EnemyType.BASIC, EnemyType.FAST, EnemyType.HEAVY], spawnIntervalMs: 1000, isBossWave: false,
     });
     this.waveConfigs.set(4, {
-      wave: 4,
-      enemyBudget: 9,
-      enemyTypes: [EnemyType.BASIC, EnemyType.FAST, EnemyType.HEAVY, EnemyType.SHIELD, EnemyType.ELITE],
-      spawnIntervalMs: 800,
-      isBossWave: false,
+      wave: 4, enemyBudget: 8,
+      enemyTypes: [EnemyType.BASIC, EnemyType.FAST, EnemyType.HEAVY, EnemyType.SHIELD], spawnIntervalMs: 900, isBossWave: false,
     });
     this.waveConfigs.set(5, {
-      wave: 5,
-      enemyBudget: 1,
-      enemyTypes: [EnemyType.ELITE],
-      spawnIntervalMs: 0,
-      isBossWave: true,
+      wave: 5, enemyBudget: 10,
+      enemyTypes: [EnemyType.BASIC, EnemyType.FAST, EnemyType.HEAVY, EnemyType.SHIELD, EnemyType.RANGED], spawnIntervalMs: 800, isBossWave: false,
+    });
+    this.waveConfigs.set(6, {
+      wave: 6, enemyBudget: 12,
+      enemyTypes: [EnemyType.FAST, EnemyType.HEAVY, EnemyType.SHIELD, EnemyType.RANGED, EnemyType.ELITE], spawnIntervalMs: 700, isBossWave: false,
+    });
+    this.waveConfigs.set(7, {
+      wave: 7, enemyBudget: 14,
+      enemyTypes: [EnemyType.BASIC, EnemyType.HEAVY, EnemyType.SHIELD, EnemyType.RANGED, EnemyType.ELITE], spawnIntervalMs: 600, isBossWave: false,
+    });
+    this.waveConfigs.set(8, {
+      wave: 8, enemyBudget: 16,
+      enemyTypes: [EnemyType.FAST, EnemyType.HEAVY, EnemyType.RANGED, EnemyType.ELITE], spawnIntervalMs: 500, isBossWave: false,
+    });
+    this.waveConfigs.set(9, {
+      wave: 9, enemyBudget: 18,
+      enemyTypes: [EnemyType.HEAVY, EnemyType.SHIELD, EnemyType.RANGED, EnemyType.ELITE], spawnIntervalMs: 400, isBossWave: false,
+    });
+    this.waveConfigs.set(10, {
+      wave: 10, enemyBudget: 1,
+      enemyTypes: [EnemyType.ELITE], spawnIntervalMs: 0, isBossWave: true,
     });
   }
 
@@ -124,7 +131,7 @@ export class WaveDirector {
       const timer = setTimeout(() => {
         this.activeSpawnTimers = this.activeSpawnTimers.filter((t) => t !== timer);
         if (this.currentWave !== config.wave) return;
-        if ((this.room as any).simulationPaused) return;
+        if ((this.room as unknown as RoomWithPause).simulationPaused) return;
         const type = config.enemyTypes[index % config.enemyTypes.length];
         this.enemySystem.spawnEnemy(type);
         this.room.state.enemiesRemaining++;
@@ -160,7 +167,7 @@ export class WaveDirector {
     this.enemySystem.clearAll();
     this.room.state.enemiesRemaining = 0;
     this.room.state.currentWave = this.currentWave;
-    this.bossSystem.spawnBoss(this.room.state.players.size);
+    this.bossController.spawnBoss(this.room.state.players.size);
     this.room.state.phase = 'game';
   }
 

@@ -1,11 +1,5 @@
-import { getWeaponStats, WeaponType, WeaponProfile } from '@storm-arena/shared';
+import { getWeaponStats, WeaponType, WeaponProfile, Vec3 } from '@storm-arena/shared';
 import { PositionHistory } from '../../lag/PositionHistory';
-
-export interface Vec3 {
-  x: number;
-  y: number;
-  z: number;
-}
 
 export interface ActiveHitbox {
   attackerId: string;
