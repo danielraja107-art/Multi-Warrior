@@ -80,10 +80,6 @@ export class CombatManager {
   }
 
   private registerMessageHandlers(): void {
-    this.room.onMessage(MESSAGE_CLIENT.PLAYER_ATTACK, (client, payload) => {
-      this.handleAttack(client, payload);
-    });
-
     this.room.onMessage(MESSAGE_CLIENT.PLAYER_DODGE, (client, payload) => {
       this.handleDodge(client, payload);
     });

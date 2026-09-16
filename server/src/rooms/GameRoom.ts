@@ -98,6 +98,7 @@ export class GameRoom extends Room<GameState> {
             this.state.boss, this.bossAI, performance.now()
           );
           if (result) {
+            this.bossSystem.syncPhaseFromHealth();
             if (result.isDead) {
               this.handleBossDefeated();
             }

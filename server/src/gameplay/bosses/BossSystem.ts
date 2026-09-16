@@ -96,7 +96,7 @@ export class BossSystem {
     }
   }
 
-  private syncPhaseFromHealth(): void {
+  public syncPhaseFromHealth(): void {
     const boss = this.room.state.boss;
     if (!boss.isActive) return;
 
