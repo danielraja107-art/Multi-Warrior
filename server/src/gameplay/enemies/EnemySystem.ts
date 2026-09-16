@@ -41,9 +41,14 @@ export class EnemySystem {
   private enemies: Map<string, EnemyInstance> = new Map();
   private currentWave = 0;
   private difficulty = 'normal';
+  private onEnemyDeathCallback: (() => void) | null = null;
 
   constructor(room: Room<GameState>) {
     this.room = room;
+  }
+
+  setOnEnemyDeathCallback(callback: () => void): void {
+    this.onEnemyDeathCallback = callback;
   }
 
   setWave(wave: number, difficulty?: string): void {
@@ -319,6 +324,7 @@ export class EnemySystem {
       this.enemies.delete(enemyId);
       this.room.state.enemies.delete(enemyId);
       this.room.state.enemiesRemaining = Math.max(0, this.room.state.enemiesRemaining - 1);
+      this.onEnemyDeathCallback?.();
     }
   }
 

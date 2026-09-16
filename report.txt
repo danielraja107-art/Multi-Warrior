@@ -1,0 +1,166 @@
+================================================================================
+STORM ARENA — FULL AUDIT REPORT
+================================================================================
+Date: 2025-09-16
+Status: 3 CRITICAL GAME-BREAKING BUGS FOUND
+================================================================================
+
+CRITICAL ISSUES (Game-Breaking)
+================================================================================
+
+CRITICAL #1: WAVE PROGRESSION IS BROKEN — WAVES NEVER TRANSITION
+───────────────────────────────────────────────────────────────
+File:     server/src/gameplay/waves/WaveDirector.ts
+Problem:  WaveDirector.onEnemyDeath() is NEVER CALLED from anywhere.
+          When all enemies die, enemiesRemaining reaches 0 but the
+          wave never ends. No rest period starts. No next wave spawns.
+Impact:   The game plays one wave and stalls permanently.
+          The entire wave system is non-functional.
+Root:     No code connects enemy death events to the wave director.
+
+
+CRITICAL #2: BOSS CANNOT TAKE DAMAGE — BOSS FIGHT IS UNWINNABLE
+──────────────────────────────────────────────────────────────
+Files:    server/src/rooms/GameRoom.ts
+          server/src/boss/CombatSystem.ts
+Problem:  Player attacks route through CombatManager, which only
+          processes hits against regular ENEMIES. No code in GameRoom
+          routes player attacks against the BOSS. The boss can damage
+          players, but players cannot damage the boss.
+Impact:   The boss fight is one-directional and impossible to win.
+Root:     Missing attack-to-boss routing in GameRoom.ts.
+
+
+CRITICAL #3: enemiesRemaining DOUBLE-DECREMENT ON KILL
+────────────────────────────────────────────────────
+Files:    server/src/gameplay/combat/CombatManager.ts (line 271)
+          server/src/gameplay/enemies/EnemySystem.ts (line 321)
+Problem:  CombatManager decrements enemiesRemaining when it kills
+          an enemy. EnemySystem ALSO decrements it when it removes
+          dead enemies on the next tick. Same kill = two decrements.
+Impact:   Waves end prematurely with enemies still alive.
+          Only ceil(N/2) kills needed to reach enemiesRemaining=0.
+Root:     Both systems own the counter. No single source of truth.
+
+
+CRITICAL #4: .env FILES NOT FULLY GITIGNORED
+───────────────────────────────────────────
+Files:    .gitignore, database/.env
+Problem:  .gitignore only has ".env" (root-level). The database/.env
+          file (containing real password "Multi-warrior") is NOT
+          covered by any gitignore rule. A "git add ." from root
+          would commit real credentials.
+Impact:   Database password leaks to GitHub if accidentally committed.
+Root:     Missing "**/.env" pattern in .gitignore.
+
+
+================================================================================
+
+HIGH ISSUES (Serious)
+================================================================================
+
+HIGH #5: CORS WILDCARD + CREDENTIALS
+  File:     server/src/config.ts, server/src/index.ts
+  Problem:  CORS_ORIGIN=* with credentials:true reflects any origin.
+            Any malicious website can make authenticated API calls.
+  Fix:     Set CORS_ORIGIN to real client domain in production.
+
+HIGH #6: setTimeout IN COMBATMANAGER NEVER CLEANED UP
+  File:     server/src/gameplay/combat/CombatManager.ts
+  Problem:  Attack/dodge timers capture player references. If room
+            disposes before timers fire, callbacks mutate destroyed state.
+  Fix:     Track timers, clear them in onDispose/onLeave.
+
+HIGH #7: setTimeout IN handleBossDefeated NOT TRACKED
+  File:     server/src/rooms/GameRoom.ts (line 340)
+  Problem:  3-second delay before victory. Room may dispose within
+            that window, causing state mutation on destroyed room.
+  Fix:     Track the timer, clear it in onDispose.
+
+HIGH #8: DUAL BOSS SYSTEMS WITH CONFLICTING PHASE LOGIC
+  Files:    server/src/gameplay/bosses/BossSystem.ts
+            server/src/boss/BossAI.ts
+  Problem:  Both compute boss phase from health independently.
+            BossAI always overrides BossSystem. One is redundant.
+  Fix:     Remove BossSystem.syncPhaseFromHealth(), keep BossAI only.
+
+HIGH #9: HOST NOT TRANSFERRED DURING IN-GAME DISCONNECT
+  File:     server/src/rooms/GameRoom.ts (lines 170-204)
+  Problem:  Host reassignment only happens in lobby phase. If host
+            disconnects during game, no player can restart.
+  Fix:     Add host reassignment in game phase onLeave.
+
+HIGH #10: SPEED HACK DETECTION IS DEAD CODE
+  File:     server/src/rooms/GameRoom.ts (lines 282-291, 364)
+  Problem:  detectSpeedHack() receives player.position for BOTH
+            arguments. Distance is always 0. Check always passes.
+  Fix:     Pass the input position, not the current position.
+
+HIGH #11: COLYSEUS 0.15 + SCHEMA V2 VERSION MISMATCH
+  File:     server/package.json
+  Problem:  @colyseus/schema v2.0 is designed for Colyseus 0.16.x,
+            not 0.15.x. May cause serialization bugs.
+  Fix:     Downgrade @colyseus/schema to v1.x or upgrade Colyseus.
+
+HIGH #12: bcryptjs ^3.0.0 DOES NOT EXIST ON NPM
+  File:     server/package.json
+  Problem:  Latest stable is 2.4.3. ^3.0.0 may resolve to nothing.
+  Fix:     Change to ^2.4.3.
+
+
+================================================================================
+
+MEDIUM ISSUES (Should fix before production)
+================================================================================
+
+MEDIUM #13: Missing HTTP security headers (no helmet)
+MEDIUM #14: console.warn bypassing structured logger
+MEDIUM #15: PositionHistory memory leak for removed enemies
+MEDIUM #16: "enemy: any" type in RockProjectileSystem
+MEDIUM #17: Reconnected player stays dead — no respawn
+MEDIUM #18: No visibility change handling (tab switching)
+MEDIUM #19: Express 4.18.x has path traversal CVE
+
+
+================================================================================
+
+WHAT WORKS vs WHAT IS BROKEN
+================================================================================
+
+  WORKS:
+    ✓ Game renders in browser (3D scene, player models, boss model)
+    ✓ Player movement (WASD, boundary clamping, 20Hz tick)
+    ✓ Melee combat against regular enemies (damage, stagger, knockback)
+    ✓ Rock projectile damage (routed through EnemySystem — fixed)
+    ✓ Player reconnection (30s window, state preserved)
+    ✓ Room creation/joining (4-letter codes)
+    ✓ Lobby (difficulty selection, color assignment)
+    ✓ Weapon pickups and drops
+    ✓ Multiplayer state sync (onChange listeners — fixed)
+
+  BROKEN:
+    ✗ Wave progression (stalls after first wave)
+    ✗ Boss fight (boss cannot take damage)
+    ✗ Enemy count tracking (double-decrement)
+    ✗ Speed hack detection (dead code)
+    ✗ Host transfer during game phase
+    ✗ Boss phase logic (two conflicting systems)
+
+
+================================================================================
+
+RECOMMENDED FIX ORDER
+================================================================================
+
+  1. Fix wave progression (connect enemy death to WaveDirector)
+  2. Fix boss damage routing (add attack-to-boss path in GameRoom)
+  3. Fix double-decrement (single source of truth for enemy count)
+  4. Fix .gitignore (add **/.env pattern)
+  5. Fix CORS (restrict to real domain for production)
+  6. Fix setTimeout cleanup (track and clear timers)
+  7. Fix boss phase logic (remove redundant BossSystem phase calc)
+
+
+================================================================================
+END OF REPORT
+================================================================================

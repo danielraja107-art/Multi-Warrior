@@ -61,6 +61,7 @@ export class CombatManager {
   private playerCooldowns: Map<string, number> = new Map();
   private playerDodgeCooldowns: Map<string, number> = new Map();
   private playerBlockStates: Map<string, boolean> = new Map();
+  private stateResetTimers: Map<string, NodeJS.Timeout> = new Map();
   private currentTick = 0;
 
   constructor(room: Room<GameState>, enemySystem?: EnemySystem) {
@@ -128,11 +129,16 @@ export class CombatManager {
 
     player.state = PlayerState.ATTACKING;
 
-    setTimeout(() => {
+    const existingTimer = this.stateResetTimers.get(`attack-${client.sessionId}`);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    const timer = setTimeout(() => {
+      this.stateResetTimers.delete(`attack-${client.sessionId}`);
       if (player && player.state === PlayerState.ATTACKING) {
         player.state = PlayerState.IDLE;
       }
     }, getWeaponCooldown(payload.weapon));
+    this.stateResetTimers.set(`attack-${client.sessionId}`, timer);
   }
 
   public handleDodge(client: Client, payload: { direction: { x: number; y: number; z: number }; timestamp: number | bigint }): void {
@@ -155,11 +161,16 @@ export class CombatManager {
 
     player.state = PlayerState.DODGING;
 
-    setTimeout(() => {
+    const existingTimer = this.stateResetTimers.get(`dodge-${client.sessionId}`);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    const timer = setTimeout(() => {
+      this.stateResetTimers.delete(`dodge-${client.sessionId}`);
       if (player && player.state === PlayerState.DODGING) {
         player.state = PlayerState.IDLE;
       }
     }, 250);
+    this.stateResetTimers.set(`dodge-${client.sessionId}`, timer);
   }
 
   public handleBlock(client: Client, payload: { active: boolean; timestamp: number | bigint }): void {
@@ -268,7 +279,6 @@ export class CombatManager {
             event: GameEvent.PLAYER_KILLED,
             data: { enemyId: enemy.id, killerId: attack.clientId },
           });
-          this.room.state.enemiesRemaining = Math.max(0, this.room.state.enemiesRemaining - 1);
         } else {
           this.room.broadcast(MESSAGE_SERVER.GAME_EVENT, {
             event: GameEvent.PLAYER_KILLED,
@@ -311,6 +321,19 @@ export class CombatManager {
     this.playerDodgeCooldowns.delete(clientId);
     this.playerBlockStates.delete(clientId);
     this.hitboxSystem.clearAttackerHitboxes(clientId);
+    const attackTimer = this.stateResetTimers.get(`attack-${clientId}`);
+    if (attackTimer) clearTimeout(attackTimer);
+    this.stateResetTimers.delete(`attack-${clientId}`);
+    const dodgeTimer = this.stateResetTimers.get(`dodge-${clientId}`);
+    if (dodgeTimer) clearTimeout(dodgeTimer);
+    this.stateResetTimers.delete(`dodge-${clientId}`);
+  }
+
+  dispose(): void {
+    for (const timer of this.stateResetTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.stateResetTimers.clear();
   }
 
   getPositionHistory(): PositionHistory {

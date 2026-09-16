@@ -59,11 +59,13 @@ export class GameRoom extends Room<GameState> {
   private bossCombat = new CombatSystem();
   private bossSpawned = false;
   private bossDefeated = false;
+  private victoryTimer: NodeJS.Timeout | null = null;
   public simulationPaused = false;
 
   onCreate(options: { difficulty?: string }) {
     this.combat.setEnemySystem(this.enemySystem);
     this.projectiles.setEnemySystem(this.enemySystem);
+    this.enemySystem.setOnEnemyDeathCallback(() => this.waveDirector.onEnemyDeath());
     this.setState(new GameState());
     this.state.roomCode = generateRoomCode();
     this.state.phase = RoomPhase.LOBBY;
@@ -87,6 +89,32 @@ export class GameRoom extends Room<GameState> {
 
     this.onMessage(MESSAGE_CLIENT.PLAYER_ATTACK, (client, payload) => {
       if (!this.validateAttackPayload(payload, client.sessionId)) return;
+
+      if (this.state.boss.isActive && this.bossAI) {
+        const player = this.state.players.get(client.sessionId);
+        if (player && player.isAlive) {
+          const result = this.bossCombat.handlePlayerAttack(
+            player, payload.type, payload.weapon,
+            this.state.boss, this.bossAI, performance.now()
+          );
+          if (result) {
+            if (result.isDead) {
+              this.handleBossDefeated();
+            }
+            this.broadcast('GAME_EVENT', {
+              event: 'boss_damaged',
+              data: {
+                targetId: client.sessionId,
+                damage: result.damage,
+                isDead: result.isDead,
+                knockbackX: result.knockbackX,
+                knockbackZ: result.knockbackZ,
+              },
+            });
+          }
+        }
+      }
+
       this.combat.handleAttack(client, payload);
     });
 
@@ -196,6 +224,15 @@ export class GameRoom extends Room<GameState> {
         if (this.state.players.has(client.sessionId)) {
           this.state.players.delete(client.sessionId);
         }
+
+        if (player.isHost && this.state.players.size > 0) {
+          const firstEntry = this.state.players.entries().next().value;
+          if (firstEntry) {
+            firstEntry[1].isHost = true;
+            this.state.hostId = firstEntry[1].id;
+          }
+        }
+
         if (this.state.players.size === 0) {
           this.disconnect();
         }
@@ -205,14 +242,17 @@ export class GameRoom extends Room<GameState> {
 
   onDispose() {
     console.warn('[game-room]', 'room disposed', { roomCode: this.state.roomCode, players: this.state.players.size });
+    this.combat.dispose();
     this.state.players.clear();
     this.state.enemies.clear();
     this.state.weaponPickups.clear();
     this.movement.clearAll();
     this.weapons.clearAll();
     this.projectiles.clearAll();
+    this.waveDirector.resetWave();
     this.bossAI = null;
     this.bossCombat.reset();
+    if (this.victoryTimer) clearTimeout(this.victoryTimer);
   }
 
   pause() {
@@ -279,11 +319,11 @@ export class GameRoom extends Room<GameState> {
     return true;
   }
 
-  detectSpeedHack(sessionId: string, pos: { x: number; y: number; z: number }, elapsedMs: number): boolean {
+  detectSpeedHack(sessionId: string, preMovePos: { x: number; y: number; z: number }, elapsedMs: number): boolean {
     const player = this.state.players.get(sessionId);
     if (!player) return false;
-    const dx = Math.abs(pos.x - player.position.x);
-    const dz = Math.abs(pos.z - player.position.z);
+    const dx = Math.abs(player.position.x - preMovePos.x);
+    const dz = Math.abs(player.position.z - preMovePos.z);
     const dist = Math.sqrt(dx * dx + dz * dz);
     const elapsed = Math.max(1, Number(elapsedMs) || 1);
     const speed = dist / (elapsed / 1000);
@@ -337,7 +377,9 @@ export class GameRoom extends Room<GameState> {
       },
     });
 
-    setTimeout(() => {
+    if (this.victoryTimer) clearTimeout(this.victoryTimer);
+    this.victoryTimer = setTimeout(() => {
+      this.victoryTimer = null;
       this.state.phase = RoomPhase.VICTORY;
       this.broadcast('GAME_EVENT', {
         event: GameEvent.MATCH_END,
@@ -360,15 +402,17 @@ export class GameRoom extends Room<GameState> {
     this.state.players.forEach((player, sessionId) => {
       if (!player.isAlive) return;
 
+      const preMovePos = { x: player.position.x, y: player.position.y, z: player.position.z };
       const update = this.movement.update(sessionId, deltaTime);
-      if (this.detectSpeedHack(sessionId, player.position, deltaTime)) {
-        player.position.x = Math.max(-MOVEMENT_BOUNDARY, Math.min(MOVEMENT_BOUNDARY, player.position.x));
-        player.position.z = Math.max(-MOVEMENT_BOUNDARY, Math.min(MOVEMENT_BOUNDARY, player.position.z));
-      }
 
       player.position.x += update.velocity.x * PLAYER_SPEED * dt;
       player.position.y += update.velocity.y * PLAYER_SPEED * dt;
       player.position.z += update.velocity.z * PLAYER_SPEED * dt;
+
+      if (this.detectSpeedHack(sessionId, preMovePos, deltaTime)) {
+        player.position.x = preMovePos.x;
+        player.position.z = preMovePos.z;
+      }
 
       player.position.x = Math.max(-MOVEMENT_BOUNDARY, Math.min(MOVEMENT_BOUNDARY, player.position.x));
       player.position.y = Math.max(-MOVEMENT_BOUNDARY, Math.min(MOVEMENT_BOUNDARY, player.position.y));
